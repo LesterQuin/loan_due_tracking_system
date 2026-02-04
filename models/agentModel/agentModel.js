@@ -71,11 +71,11 @@ export const getAgentByEmail = async (email) => {
 };
 
 // ========================= OTP FUNCTIONS =========================
-
 // Save OTP with expiry (5 mins)
+// ========================= SAVE OTP =========================
 export const saveOTP = async (agentId, otp) => {
     const pool = await poolPromise;
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // OTP valid for 5 minutes
     await pool.request()
         .input('agentId', sql.Int, agentId)
         .input('otp', sql.Char(6), otp)
@@ -87,7 +87,7 @@ export const saveOTP = async (agentId, otp) => {
         `);
 };
 
-// Verify OTP
+// ========================= VERIFY OTP =========================
 export const verifyOTP = async (agentId, otp) => {
     const pool = await poolPromise;
     const result = await pool.request()
@@ -105,10 +105,10 @@ export const verifyOTP = async (agentId, otp) => {
 
     const now = new Date();
     const expiresAt = result.recordset[0].otpExpiresAt;
-    return now <= expiresAt;
+    return now <= expiresAt; // true if OTP still valid
 };
 
-// Clear OTP after successful verification
+// ========================= CLEAR OTP =========================
 export const clearOtp = async (agentId) => {
     const pool = await poolPromise;
     await pool.request()
@@ -117,5 +117,31 @@ export const clearOtp = async (agentId) => {
             UPDATE ldts_Agents
             SET mustVerifyOtp = 0, otpCode = NULL, otpExpiresAt = NULL
             WHERE id = @agentId
+        `);
+};
+
+
+// ========================= LOGOUT =========================
+export const logoutAgent = async (email) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('email', sql.VarChar, email)
+        .query(`
+            UPDATE ldts_Agents
+            SET mustVerifyOtp = 0, otpCode = NULL, otpExpiresAt = NULL
+            WHERE email = @email
+        `);
+};
+
+// Save refresh token in database
+export const saveRefreshToken = async (agentId, refreshToken, expiresAt) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('agentId', sql.Int, agentId)
+        .input('refreshToken', sql.VarChar, refreshToken)
+        .input('expiresAt', sql.DateTime, expiresAt)
+        .query(`
+            INSERT INTO ldts_AgentTokens (agentId, refreshToken, created_at, expires_at)
+            VALUES (@agentId, @refreshToken, GETDATE(), @expiresAt)
         `);
 };

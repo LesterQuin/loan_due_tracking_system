@@ -1,3 +1,4 @@
+import { sql, poolPromise } from '../../config/db.js';
 import * as Agent from '../../models/agentModel/agentModel.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -73,33 +74,47 @@ export const register = async (req, res) => {
 // ========================= LOGIN =========================
 export const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password) return res.status(400).json({ message: 'Email and Password required.' });
+        const { email, password, newPassword } = req.body;
+        if (!email || !password) 
+            return res.status(400).json({ message: 'Email and Password required.' });
 
         const agent = await Agent.getAgentByEmail(email);
-        if (!agent) return res.status(401).json({ message: 'Invalid credentials.' });
+        if (!agent) 
+            return res.status(401).json({ message: 'Invalid credentials.' });
 
         const validPassword = await bcrypt.compare(password, agent.password);
-        if (!validPassword) return res.status(401).json({ message: 'Invalid credentials.' });
+        if (!validPassword) 
+            return res.status(401).json({ message: 'Invalid credentials.' });
 
-        // Check if agent must change password
+        // Handle temp password change
         if (agent.mustChangePassword) {
-        return res.status(403).json({ message: 'Password reset required. Please change your password before login.' });
+            if (!newPassword) 
+                return res.status(403).json({ message: 'Password reset required. Please provide a new password.' });
+
+            // Validate new password
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
+            if (!passwordRegex.test(newPassword)) 
+                return res.status(400).json({ 
+                    message: 'New password must be 8+ chars, include upper, lower, number' 
+                });
+
+            // Update password
+            await Agent.updatePassword(email, newPassword);
         }
 
-        // Check if OTP already sent
-        let otp = generateOTP();
-        await Agent.saveOTP(agent.id, otp); // save OTP with expiry in DB (you'll need this function)
+        // Generate OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        await Agent.saveOTP(agent.id, otp);
 
         // Send OTP email
         await transporter.sendMail({
-        from: `"LDTS System" <${process.env.SMTP_USER}>`,
-        to: email,
-        subject: 'Your Login OTP',
-        html: otpTemplate(agent.firstname, otp)
+            from: `"LDTS System" <${process.env.SMTP_USER}>`,
+            to: email,
+            subject: 'Your Login OTP',
+            html: otpTemplate(agent.firstname, otp)
         });
 
-        res.json({ message: 'OTP sent to your email. Please verify before login.' });
+        res.json({ message: 'OTP sent to your email. Please verify to complete login.' });
 
     } catch (err) {
         console.error('LOGIN ERROR:', err);
@@ -111,15 +126,19 @@ export const login = async (req, res) => {
 export const verifyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        if (!email || !otp) return res.status(400).json({ message: 'Email and OTP required.' });
+        if (!email || !otp) 
+            return res.status(400).json({ message: 'Email and OTP required.' });
 
         const agent = await Agent.getAgentByEmail(email);
-        if (!agent) return res.status(401).json({ message: 'Invalid credentials.' });
+        if (!agent) 
+            return res.status(401).json({ message: 'Invalid credentials.' });
 
-        const isValid = await Agent.verifyOTP(agent.id, otp); // compare OTP & check expiry
-        if (!isValid) return res.status(401).json({ message: 'Invalid or expired OTP.' });
+        // Verify OTP
+        const isValid = await Agent.verifyOTP(agent.id, otp);
+        if (!isValid) 
+            return res.status(401).json({ message: 'Invalid or expired OTP.' });
 
-        // Clear OTP after successful verification
+        // Clear OTP
         await Agent.clearOtp(agent.id);
 
         // Generate tokens
@@ -127,7 +146,23 @@ export const verifyOTP = async (req, res) => {
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
         const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
 
-        res.json({ message: 'Login successful', accessToken, refreshToken });
+        // Save refresh token to DB
+        const pool = await poolPromise;
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days expiry
+        await pool.request()
+            .input('agentId', sql.Int, agent.id)
+            .input('refreshToken', sql.VarChar, refreshToken)
+            .input('expiresAt', sql.DateTime, expiresAt)
+            .query(`
+                INSERT INTO ldts_AgentTokens (agentId, refreshToken, created_at, expires_at)
+                VALUES (@agentId, @refreshToken, GETDATE(), @expiresAt)
+            `);
+
+        res.json({ 
+            message: 'Login successful',
+            accessToken,
+            refreshToken
+        });
 
     } catch (err) {
         console.error('VERIFY OTP ERROR:', err);
@@ -179,5 +214,40 @@ export const resendOTP = async (req, res) => {
     } catch (err) {
         console.error('RESEND OTP ERROR:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// =========================  =========================
+export const logout = async (req, res) => {
+    try {
+        const { email, refreshToken } = req.body;
+
+        if (!email || !refreshToken) 
+            return res.status(400).json({ message: "Email and refreshToken required" });
+
+        const agent = await Agent.getAgentByEmail(email);
+        if (!agent) 
+            return res.status(404).json({ message: "Agent not found" });
+
+        const pool = await poolPromise;
+
+        // Delete the refresh token from DB
+        await pool.request()
+            .input('agentId', sql.Int, agent.id)
+            .input('refreshToken', sql.VarChar, refreshToken)
+            .query(`
+                DELETE FROM ldts_AgentTokens
+                WHERE agentId = @agentId
+                AND refreshToken = @refreshToken
+            `);
+
+        // Optional: clear OTP flags if still set
+        await Agent.logoutAgent(email);
+
+        res.json({ message: "Logged out successfully" });
+
+    } catch (err) {
+        console.error("LOGOUT ERROR:", err);
+        res.status(500).json({ message: "Server error", error: err.message });
     }
 };
