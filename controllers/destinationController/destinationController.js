@@ -1,4 +1,3 @@
-import express from "express";
 import * as Destination from '../../models/destinationModel/destinationModel.js'
 
 //Create
