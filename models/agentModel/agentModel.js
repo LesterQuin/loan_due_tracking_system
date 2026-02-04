@@ -105,7 +105,7 @@ export const verifyOTP = async (agentId, otp) => {
 
     const now = new Date();
     const expiresAt = result.recordset[0].otpExpiresAt;
-    return now <= expiresAt; // true if OTP still valid
+    return now <= expiresAt; 
 };
 
 // ========================= CLEAR OTP =========================
