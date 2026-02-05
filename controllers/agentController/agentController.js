@@ -28,29 +28,49 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 // ========================= REGISTER =========================
 export const register = async (req, res) => {
     try {
-        const { firstname, middlename, lastname, email, departmentId, regionId, userType } = req.body;
+        let { firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType } = req.body;
 
-        if (!firstname || !lastname || !email || !departmentId || !userType){
+        // normalize optimal fields
+        agentCode = agentCode?.trim() || null;
+        divisionId = divisionId || null;
+
+        if (!firstname || !lastname || !email || !departmentId || !regionId || !userType){
         return res.status(400).json({ message: "Missing required fields" });
         }
 
         const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillife\.com\.ph)$/i;
-        if (!emailRegex.test(email)) return res.status(400).json({ message: "Invalid domain address" });
+        if (!emailRegex.test(email)) 
+            return res.status(400).json({ message: "Invalid domain address" });
 
-        if (!['CCO', 'Agent'].includes(userType)) return res.status(400).json({ message: "Invalid userType." });
+        if (!['Admin', 'MD', 'SD', 'FC'].includes(userType)) 
+            return res.status(400).json({ message: "Invalid userType." });
 
         const validDept = await Agent.isValidDepartment(departmentId);
-        if (!validDept) return res.status(400).json({ message: "Invalid departmentId" });
+        if (!validDept) 
+            return res.status(400).json({ message: "Invalid departmentId" });
 
         const validReg = regionId ? await Agent.isValidRegion(regionId) : true;
-        if (!validReg) return res.status(400).json({ message: "Invalid regionId" });
+        if (!validReg) 
+            return res.status(400).json({ message: "Invalid regionId" });
+
+        const validDiv = await Agent.isValidDivision(regionId, divisionId);
+        if (!validDiv) 
+            return res.status(400).json({ message: "Invalid division for the select region."})
+
+        // optional agentcode
+        if (agentCode) {
+            const exist = await Agent.getAgentByCode(agentCode);
+            if (exist)
+                return res.status(400).json({ message: "Agent code already exist."});
+        }
 
         const existing = await Agent.getAgentByEmail(email);
-        if (existing) return res.status(400).json({ message: "Email already registered." });
+        if (existing) 
+            return res.status(400).json({ message: "Email already registered." });
 
         // Create agent with temp password
         const newAgent = await Agent.createAgent(
-        firstname, middlename, lastname, email, departmentId, regionId, userType
+        firstname, middlename, lastname, email, agentCode, departmentId, regionId, userType
         );
 
         // Send temp password email

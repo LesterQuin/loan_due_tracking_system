@@ -3,9 +3,8 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 // ========================= CREATE AGENT =========================
-export const createAgent = async (firstname, middlename, lastname, email, departmentId, regionId, userType) => {
+export const createAgent = async (firstname, middlename, lastname, email, agentCode, departmentId, regionId, userType) => {
     const pool = await poolPromise;
-    const agentCode = 'AGT' + Date.now();
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
@@ -18,17 +17,34 @@ export const createAgent = async (firstname, middlename, lastname, email, depart
         .input('userType', sql.VarChar, userType)
         .input('departmentId', sql.Int, departmentId)
         .input('regionId', sql.Int, regionId)
+        .input('divisionId', sql.Int, divisionId)
         .input('password', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit, 1)
         .query(`
             INSERT INTO ldts_Agents
-            (firstname, middlename, lastname, email, agentCode, userType, departmentId, regionId, password, mustChangePassword)
+            (firstname, middlename, lastname, email, agentCode, userType, departmentId, regionId, divisionId, password, mustChangePassword)
             OUTPUT INSERTED.id AS agentId
-            VALUES (@firstname, @middlename, @lastname, @email, @agentCode, @userType, @departmentId, @regionId, @password, @mustChangePassword)
+            VALUES (@firstname, @middlename, @lastname, @email, @agentCode, @userType, @departmentId, @regionId, @divisionId, @password, @mustChangePassword)
         `);
 
     return { ...result.recordset[0], tempPassword };
 };
+
+export const isValidDivision = async (regionId, divisionId) => {
+    if (!divisionId) return true;
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('regionId', sql.Int, regionId)
+        .input('divisionId', sql.Int, divisionId)
+        .query(`
+            SELECT id
+            FROM ldts_Divisions
+            WHERE id = @divisionId
+            AND regionID = @regionId
+            AND isActive = 1
+        `);
+    return result.recordset.length > 0;
+;}
 
 // ========================= UPDATE PASSWORD =========================
 export const updatePassword = async (email, newPassword) => {
