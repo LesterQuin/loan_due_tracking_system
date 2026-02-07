@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import destinationRoutes from "./routes/destinationRoute/destinationRoutes.js";
 import agentRoutes from "./routes/agentRoute/agentRoutes.js"
+import pastDueRoutes from "./routes/pastDueRoute/pastDueRoutes.js"
 
 dotenv.config();
 
@@ -11,7 +12,8 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/destinations", destinationRoutes);
-app.use("/api/agents",agentRoutes);
+app.use("/api/agents", agentRoutes);
+app.use("/api/pastdue", pastDueRoutes);
 
 // Test endpoint
 app.get("/api/hello", (req, res) => {
