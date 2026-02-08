@@ -97,3 +97,41 @@ function excelDateToJSDate(serial) {
     const year = date_info.getFullYear();
     return `${month}/${day}/${year}`; // returns as string e.g., "05/30/2004"
 }
+
+export const exportExcel = async (req, res) => {
+    try {
+        console.log('[EXPORT] Starting export process...');
+
+        const reports = await Report.getReports();
+        console.log(`[EXPORT] Reports fetched from DB: ${reports.length}`);
+
+        if (!reports.length) {
+            console.log('[EXPORT] No reports found, sending 404');
+            return res.status(404).json({ message: 'No reports found.' });
+        }
+
+        // Convert to worksheet
+        const worksheet = xlsx.utils.json_to_sheet(reports);
+        console.log('[EXPORT] Worksheet created');
+
+        const workbook = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'PastDueReports');
+        console.log('[EXPORT] Workbook created and worksheet appended');
+
+        // Generate buffer
+        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        console.log('[EXPORT] Excel buffer generated');
+
+        res.setHeader('Content-Disposition', 'attachment; filename=past_due_reports.xlsx');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        console.log('[EXPORT] Sending response...');
+        res.send(buffer);
+
+        console.log('[EXPORT] Export finished successfully');
+
+    } catch (err) {
+        console.error('[EXPORT ERROR]', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};

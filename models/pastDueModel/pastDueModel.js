@@ -51,3 +51,15 @@ export const insertReports = async (reports) => {
 
     await pool.request().bulk(table);
 };
+
+export const getReports = async () => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .query('SELECT * FROM [LDTS].[dbo].[ldts_Past_Due_Reports]');
+        return result.recordset;
+    } catch (err) {
+        console.error('GET REPORTS ERROR:', err);
+        throw err;
+    }
+};
