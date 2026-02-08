@@ -3,21 +3,21 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 // ========================= CREATE AGENT =========================
-export const createAgent = async (firstname, middlename, lastname, email, agentCode, departmentId, regionId, userType) => {
+export const createAgent = async (firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType) => {
     const pool = await poolPromise;
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     const result = await pool.request()
         .input('firstname', sql.VarChar, firstname)
-        .input('middlename', sql.VarChar, middlename)
+        .input('middlename', sql.VarChar, middlename || null)
         .input('lastname', sql.VarChar, lastname)
         .input('email', sql.VarChar, email)
-        .input('agentCode', sql.VarChar, agentCode)
+        .input('agentCode', sql.VarChar, agentCode || null)
         .input('userType', sql.VarChar, userType)
         .input('departmentId', sql.Int, departmentId)
         .input('regionId', sql.Int, regionId)
-        .input('divisionId', sql.Int, divisionId)
+        .input('divisionId', sql.Int, divisionId || null)
         .input('password', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit, 1)
         .query(`

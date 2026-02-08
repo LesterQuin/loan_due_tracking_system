@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-
+import { resolveScope } from '../../utils/scope.js';
 import { tempPasswordTemplate } from '../../templates/tempPasswordTemplate.js';
 import { otpTemplate } from '../../templates/otpTemplate.js';
 
@@ -24,6 +24,21 @@ const transporter = nodemailer.createTransport({
 
 // Helper: generate random OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+
+export const getDepartmentPermissions = (departmentId) => {
+    switch (departmentId) {
+        case 1:
+            return { canUpload: true, canImport: false, canExport: false, viewOnly: false };
+        case 2:
+            return { canUpload: false, canImport: true, canExport: true, viewOnly: false };
+        case 3:
+            return { canUpload: false, canImport: false, canExport: false, viewOnly: true };
+        default:
+            return { canUpload: false, canImport: false, canExport: false, viewOnly: true };
+    }
+};
+
 
 // ========================= REGISTER =========================
 export const register = async (req, res) => {
@@ -70,7 +85,7 @@ export const register = async (req, res) => {
 
         // Create agent with temp password
         const newAgent = await Agent.createAgent(
-        firstname, middlename, lastname, email, agentCode, departmentId, regionId, userType
+        firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType
         );
 
         // Send temp password email
@@ -178,10 +193,23 @@ export const verifyOTP = async (req, res) => {
                 VALUES (@agentId, @refreshToken, GETDATE(), @expiresAt)
             `);
 
+        const permissions = getDepartmentPermissions(agent.departmentId);
+        const scope = resolveScope(agent);
+
         res.json({ 
             message: 'Login successful',
             accessToken,
-            refreshToken
+            refreshToken,
+            user: {
+                id: agent.id,
+                email: agent.email,
+                userType: agent.userType,
+                departmentId: agent.departmentId,
+                regionId: agent.regionId,
+                divisionId: agent.departmentId
+            },
+            permissions,
+            scope
         });
 
     } catch (err) {
