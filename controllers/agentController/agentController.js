@@ -25,9 +25,23 @@ const transporter = nodemailer.createTransport({
 // Helper: generate random OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+export const getDepartmentPermissions = (agent) => {
+    // Priority: userType overrides department
+    switch (agent.userType) {
+        case 'Admin':
+            return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
+        case 'MD':
+            return { canUpload: true, canImport: true, canExport: true, viewOnly: false }; // national manager
+        case 'SD':
+            return { canUpload: false, canImport: false, canExport: true, viewOnly: false }; // regional manager
+        case 'FC':
+            return { canUpload: false, canImport: false, canExport: false, viewOnly: true }; // field collector
+        default:
+            break;
+    }
 
-export const getDepartmentPermissions = (departmentId) => {
-    switch (departmentId) {
+    // Fallback based on departmentId
+    switch (agent.departmentId) {
         case 1:
             return { canUpload: true, canImport: false, canExport: false, viewOnly: false };
         case 2:
@@ -39,21 +53,21 @@ export const getDepartmentPermissions = (departmentId) => {
     }
 };
 
-
 // ========================= REGISTER =========================
 export const register = async (req, res) => {
     try {
-        let { firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType } = req.body;
+        let { firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber } = req.body;
 
         // normalize optimal fields
         agentCode = agentCode?.trim() || null;
         divisionId = divisionId || null;
+        phoneNumber = phoneNumber?.trim() || null;
 
         if (!firstname || !lastname || !email || !departmentId || !regionId || !userType){
         return res.status(400).json({ message: "Missing required fields" });
         }
 
-        const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillife\.com\.ph)$/i;
+        const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i;
         if (!emailRegex.test(email)) 
             return res.status(400).json({ message: "Invalid domain address" });
 
@@ -72,20 +86,13 @@ export const register = async (req, res) => {
         if (!validDiv) 
             return res.status(400).json({ message: "Invalid division for the select region."})
 
-        // optional agentcode
-        if (agentCode) {
-            const exist = await Agent.getAgentByCode(agentCode);
-            if (exist)
-                return res.status(400).json({ message: "Agent code already exist."});
-        }
-
         const existing = await Agent.getAgentByEmail(email);
         if (existing) 
             return res.status(400).json({ message: "Email already registered." });
 
         // Create agent with temp password
         const newAgent = await Agent.createAgent(
-        firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType
+        firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber
         );
 
         // Send temp password email
@@ -180,21 +187,22 @@ export const verifyOTP = async (req, res) => {
         const payload = { id: agent.id, email: agent.email, userType: agent.userType };
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
         const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
-
-        // Save refresh token to DB
-        const pool = await poolPromise;
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days expiry
-        await pool.request()
-            .input('agentId', sql.Int, agent.id)
-            .input('refreshToken', sql.VarChar, refreshToken)
-            .input('expiresAt', sql.DateTime, expiresAt)
-            .query(`
-                INSERT INTO ldts_AgentTokens (agentId, refreshToken, created_at, expires_at)
-                VALUES (@agentId, @refreshToken, GETDATE(), @expiresAt)
-            `);
+        
+        // Save Access Token
+        const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+        await Agent.saveTokens(agent.id, accessToken, refreshToken, accessTokenExpiry);
 
         const permissions = getDepartmentPermissions(agent.departmentId);
         const scope = resolveScope(agent);
+
+        const regions = await Agent.getRegions();
+        const departments = await Agent.getDepartments();
+        const divisions = await Agent.getDivisionsByRegion(agent.regionId); // optionally filter by region
+
+        // Fetch reference data
+        const region = regions.find(r => r.id === agent.regionId);
+        const department = departments.find(d => d.id === agent.departmentId);
+        const division = divisions.find(d => d.id === agent.divisionId);
 
         res.json({ 
             message: 'Login successful',
@@ -205,8 +213,11 @@ export const verifyOTP = async (req, res) => {
                 email: agent.email,
                 userType: agent.userType,
                 departmentId: agent.departmentId,
+                departmentName: department?.departmentName || null,
                 regionId: agent.regionId,
-                divisionId: agent.departmentId
+                regionName: region?.regionName || null,
+                divisionId: agent.divisionId,
+                divisionName: division?.divisionName || null
             },
             permissions,
             scope

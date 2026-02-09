@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 // ========================= CREATE AGENT =========================
-export const createAgent = async (firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType) => {
+export const createAgent = async (firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber) => {
     const pool = await poolPromise;
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
@@ -18,33 +18,18 @@ export const createAgent = async (firstname, middlename, lastname, email, agentC
         .input('departmentId', sql.Int, departmentId)
         .input('regionId', sql.Int, regionId)
         .input('divisionId', sql.Int, divisionId || null)
+        .input('phoneNumber', sql.VarChar, phoneNumber || null)
         .input('password', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit, 1)
         .query(`
             INSERT INTO ldts_Agents
-            (firstname, middlename, lastname, email, agentCode, userType, departmentId, regionId, divisionId, password, mustChangePassword)
+            (firstname, middlename, lastname, email, agentCode, userType, departmentId, regionId, divisionId, phoneNumber, password, mustChangePassword)
             OUTPUT INSERTED.id AS agentId
-            VALUES (@firstname, @middlename, @lastname, @email, @agentCode, @userType, @departmentId, @regionId, @divisionId, @password, @mustChangePassword)
+            VALUES (@firstname, @middlename, @lastname, @email, @agentCode, @userType, @departmentId, @regionId, @divisionId, @phoneNumber, @password, @mustChangePassword)
         `);
 
     return { ...result.recordset[0], tempPassword };
 };
-
-export const isValidDivision = async (regionId, divisionId) => {
-    if (!divisionId) return true;
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input('regionId', sql.Int, regionId)
-        .input('divisionId', sql.Int, divisionId)
-        .query(`
-            SELECT id
-            FROM ldts_Divisions
-            WHERE id = @divisionId
-            AND regionID = @regionId
-            AND isActive = 1
-        `);
-    return result.recordset.length > 0;
-;}
 
 // ========================= UPDATE PASSWORD =========================
 export const updatePassword = async (email, newPassword) => {
@@ -61,6 +46,22 @@ export const updatePassword = async (email, newPassword) => {
 };
 
 // ========================= VALIDATIONS =========================
+export const isValidDivision = async (regionId, divisionId) => {
+    if (!divisionId) return true;
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('regionId', sql.Int, regionId)
+        .input('divisionId', sql.Int, divisionId)
+        .query(`
+            SELECT id
+            FROM ldts_Divisions
+            WHERE id = @divisionId
+            AND regionID = @regionId
+            AND isActive = 1
+        `);
+    return result.recordset.length > 0;
+;}
+
 export const isValidDepartment = async (departmentId) => {
     const pool = await poolPromise;
     const result = await pool.request()
@@ -86,8 +87,42 @@ export const getAgentByEmail = async (email) => {
     return result.recordset[0];
 };
 
-// ========================= OTP FUNCTIONS =========================
-// Save OTP with expiry (5 mins)
+// ========================= REFERENCE DATA =========================
+export const getRegions = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT TOP 1000 id, regionName, regionCode, isActive, created_at, modified_at
+            FROM ldts_Regions
+            ORDER BY regionName
+        `);
+    return result.recordset;
+};
+
+export const getDepartments = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT TOP 1000 id, departmentName, isActive
+            FROM ldts_Departments
+            ORDER BY departmentName
+        `);
+    return result.recordset;
+};
+
+export const getDivisionsByRegion = async (regionId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('regionId', sql.Int, regionId)
+        .query(`
+            SELECT TOP 1000 id, divisionName 
+            FROM ldts_Divisions 
+            WHERE regionId = @regionId 
+            ORDER BY divisionName
+        `);
+    return result.recordset;
+};
+
 // ========================= SAVE OTP =========================
 export const saveOTP = async (agentId, otp) => {
     const pool = await poolPromise;
@@ -150,14 +185,19 @@ export const logoutAgent = async (email) => {
 };
 
 // Save refresh token in database
-export const saveRefreshToken = async (agentId, refreshToken, expiresAt) => {
+export const saveTokens = async (agentId, accessToken, refreshToken, accessTokenExpiry) => {
     const pool = await poolPromise;
     await pool.request()
         .input('agentId', sql.Int, agentId)
+        .input('accessToken', sql.VarChar, accessToken)
         .input('refreshToken', sql.VarChar, refreshToken)
-        .input('expiresAt', sql.DateTime, expiresAt)
+        .input('accessTokenExpiry', sql.DateTime, accessTokenExpiry)
         .query(`
-            INSERT INTO ldts_AgentTokens (agentId, refreshToken, created_at, expires_at)
-            VALUES (@agentId, @refreshToken, GETDATE(), @expiresAt)
+            UPDATE ldts_Agents
+            SET accessToken = @accessToken,
+                refreshToken = @refreshToken,
+                tokenExpiresAt = @accessTokenExpiry,
+                modified_at = GETDATE()
+            WHERE id = @agentId
         `);
 };
