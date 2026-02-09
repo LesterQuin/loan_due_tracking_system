@@ -31,11 +31,11 @@ export const getDepartmentPermissions = (agent) => {
         case 'Admin':
             return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
         case 'MD':
-            return { canUpload: true, canImport: true, canExport: true, viewOnly: false }; // national manager
+            return { canUpload: true, canImport: true, canExport: true, viewOnly: false }; 
         case 'SD':
-            return { canUpload: false, canImport: false, canExport: true, viewOnly: false }; // regional manager
+            return { canUpload: false, canImport: false, canExport: true, viewOnly: false }; 
         case 'FC':
-            return { canUpload: false, canImport: false, canExport: false, viewOnly: true }; // field collector
+            return { canUpload: false, canImport: false, canExport: false, viewOnly: true }; 
         default:
             break;
     }
@@ -241,7 +241,7 @@ export const verifyOTP = async (req, res) => {
 
         const regions = await Agent.getRegions();
         const departments = await Agent.getDepartments();
-        const divisions = await Agent.getDivisionsByRegion(agent.regionId); // optionally filter by region
+        const divisions = await Agent.getDivisionsByRegion(agent.regionId); 
 
         // Fetch reference data
         const region = regions.find(r => r.id === agent.regionId);
@@ -444,7 +444,7 @@ export const refreshToken = async (req, res) => {
                 message: 'Refresh token mismatch.'
             });
         }
-        
+
         // Fetch reference data
         const regions = await Agent.getRegions();
         const departments = await Agent.getDepartments();

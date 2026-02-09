@@ -96,7 +96,7 @@ function excelDateToJSDate(serial) {
     const month = (date_info.getMonth() + 1).toString().padStart(2, '0');
     const day = date_info.getDate().toString().padStart(2, '0');
     const year = date_info.getFullYear();
-    return `${month}/${day}/${year}`; // returns as string e.g., "05/30/2004"
+    return `${month}/${day}/${year}`; 
 }
 
 export const exportExcel = async (req, res) => {

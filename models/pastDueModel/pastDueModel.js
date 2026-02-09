@@ -9,9 +9,9 @@ export const insertReports = async (reports) => {
 
     // Define columns in the same order as the DB table
     table.columns.add('loan_account_no', sql.VarChar(50), { nullable: false });
-    table.columns.add('disb_date', sql.VarChar(50), { nullable: true }); // string
-    table.columns.add('funder', sql.VarChar(100), { nullable: true });    // new
-    table.columns.add('tcaa', sql.VarChar(100), { nullable: true });      // new
+    table.columns.add('disb_date', sql.VarChar(50), { nullable: true }); 
+    table.columns.add('funder', sql.VarChar(100), { nullable: true });    
+    table.columns.add('tcaa', sql.VarChar(100), { nullable: true });      
     table.columns.add('written_off', sql.VarChar(10), { nullable: true });
     table.columns.add('smrd_coll_agency', sql.VarChar(50), { nullable: true });
     table.columns.add('region', sql.VarChar(50), { nullable: true });
@@ -24,9 +24,9 @@ export const insertReports = async (reports) => {
     table.columns.add('principal_value', sql.Decimal(15,2), { nullable: true });
     table.columns.add('amort_amt', sql.Decimal(15,2), { nullable: true });
     table.columns.add('out_prin_bal', sql.Decimal(15,2), { nullable: true });
-    table.columns.add('last_payment_date', sql.VarChar(50), { nullable: true }); // string
-    table.columns.add('first_due_date', sql.VarChar(50), { nullable: true });    // string
-    table.columns.add('maturity_date', sql.VarChar(50), { nullable: true });     // string
+    table.columns.add('last_payment_date', sql.VarChar(50), { nullable: true }); 
+    table.columns.add('first_due_date', sql.VarChar(50), { nullable: true });    
+    table.columns.add('maturity_date', sql.VarChar(50), { nullable: true });     
     table.columns.add('past_due', sql.Decimal(15,2), { nullable: true });
     table.columns.add('orb', sql.Decimal(15,2), { nullable: true });
     table.columns.add('nfc', sql.Decimal(15,2), { nullable: true });
