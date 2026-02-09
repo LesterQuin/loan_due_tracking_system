@@ -208,7 +208,7 @@ export const saveTokens = async (agentId, accessToken, refreshToken, accessToken
         .input('accessTokenExpiry', sql.DateTime, accessTokenExpiry)
         .query(`
             UPDATE ldts_Agents
-            SET accessToken = @accessToken,
+            SET accessToken = @accessToken, 
                 refreshToken = @refreshToken,
                 tokenExpiresAt = @accessTokenExpiry,
                 modified_at = GETDATE()

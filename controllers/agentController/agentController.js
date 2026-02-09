@@ -354,7 +354,7 @@ export const resendOTP = async (req, res) => {
     }
 };
 
-// =========================  =========================
+// ========================= LOGOUT =========================
 export const logout = async (req, res) => {
     try {
         const { email, refreshToken } = req.body;
@@ -399,3 +399,80 @@ export const logout = async (req, res) => {
         });
     }
 };
+
+// ========================= REFRESH TOKEN =========================
+export const refreshToken = async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (!refreshToken) {
+            return res.status(400).json({
+                status: 'false',
+                message: 'Refresh token required.'
+            });
+        }
+
+        // Verify refresh token 
+        let decoded;
+        try {
+            decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        } catch (err) {
+            return res.status(401).json({
+                status: 'false',
+                message: 'Agent not found.'
+            });
+        }
+
+        // Fetch Agent
+        const agent = await Agent.getAgentByEmail(decoded.email);
+        if (!agent) {
+            return res.status(404).json({
+                status: 'false',
+                message: 'Agent not found.'
+            });
+        }
+
+        // Match token
+        if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
+            return res.status(401).json({
+                status: 'false',
+                message: 'Refresg token mismatch.'
+            });
+        }
+
+        // Generate new access token
+        const payload = {
+            id: agent.id,
+            email: agent.email,
+            userType: agent.userType
+        };
+
+        const newAccessToken = jwt.sign(
+            payload,
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN }
+        );
+
+        const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+
+        await Agent.saveTokens(
+            agent.id,
+            newAccessToken,
+            refreshToken,
+            accessTokenExpiry
+        );
+
+        res.json({
+            status: 'true',
+            message: 'Access token refreshed.',
+            accessToken: newAccessToken
+        });
+
+    } catch (err) {
+        console.error("REFRESH TOKEN ERROR:", err);
+        res.status(500).json({ 
+            status: 'false', 
+            message: "Server error", error: err.message 
+        });
+    }
+}
