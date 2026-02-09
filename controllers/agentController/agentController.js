@@ -255,6 +255,11 @@ export const verifyOTP = async (req, res) => {
             user: {
                 id: agent.id,
                 email: agent.email,
+                firstname: agent.firstname,
+                middlename: agent.middlename,
+                lastname: agent.lastname,
+                agentCode: agent.agentCode,
+                phoneNumber: agent.phoneNumber,
                 userType: agent.userType,
                 departmentId: agent.departmentId,
                 departmentName: department?.departmentName || null,
@@ -419,7 +424,7 @@ export const refreshToken = async (req, res) => {
         } catch (err) {
             return res.status(401).json({
                 status: 'false',
-                message: 'Agent not found.'
+                message: 'Invalid or expired refresh token.'
             });
         }
 
@@ -436,9 +441,18 @@ export const refreshToken = async (req, res) => {
         if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
             return res.status(401).json({
                 status: 'false',
-                message: 'Refresg token mismatch.'
+                message: 'Refresh token mismatch.'
             });
         }
+        
+        // Fetch reference data
+        const regions = await Agent.getRegions();
+        const departments = await Agent.getDepartments();
+        const divisions = await Agent.getDivisionsByRegion(agent.regionId);
+
+        const region = regions.find(r => r.id === agent.regionId) || { regionName: null };
+        const department = departments.find(d => d.id === agent.departmentId) || { departmentName: null };
+        const division = divisions.find(d => d.id === agent.divisionId) || { divisionName: null };
 
         // Generate new access token
         const payload = {
@@ -465,9 +479,26 @@ export const refreshToken = async (req, res) => {
         res.json({
             status: 'true',
             message: 'Access token refreshed.',
-            accessToken: newAccessToken
+            accessToken: newAccessToken,
+            user: {
+                id: agent.id,
+                email: agent.email,
+                firstname: agent.firstname,
+                middlename: agent.middlename,
+                lastname: agent.lastname,
+                agentCode: agent.agentCode,
+                phoneNumber: agent.phoneNumber,
+                userType: agent.userType,
+                departmentId: agent.departmentId,
+                departmentName: department?.departmentName || null,
+                regionId: agent.regionId,
+                regionName: region?.regionName || null,
+                divisionId: agent.divisionId,
+                divisionName: division?.divisionName || null
+            },
         });
 
+        
     } catch (err) {
         console.error("REFRESH TOKEN ERROR:", err);
         res.status(500).json({ 
