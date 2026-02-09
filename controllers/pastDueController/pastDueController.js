@@ -1,3 +1,4 @@
+// pastDueController.js
 import * as Report from '../../models/pastDueModel/pastDueModel.js';
 import xlsx from 'xlsx';
 
@@ -132,6 +133,62 @@ export const exportExcel = async (req, res) => {
 
     } catch (err) {
         console.error('[EXPORT ERROR]', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// Admin view
+export const getAdminReports = async (req, res) => {
+    try {
+        const reports = await Report.getAllReports();
+        console.log('[ADMIN VIEW] Records fetched:', reports.length);
+
+        res.json({
+            message: 'Admin reports fetched successfully',
+            data: reports
+        });
+    } catch (err) {
+        console.error('[ADMIN VIEW] ERROR:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// Department view
+export const getDepartmentReports = async (req, res) => {
+    try {
+        const { departmentId } = req.user; // set from JWT
+        const reports = await Report.getReportsByDepartment(departmentId);
+
+        console.log('[DEPARTMENT VIEW] Records fetched:', reports.length);
+
+        res.json({
+            message: 'Department reports fetched successfully',
+            data: reports
+        });
+    } catch (err) {
+        console.error('[DEPARTMENT VIEW] ERROR:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+export const getLoanDueDetails = async (req, res) => {
+    try {
+        const { filterBy, agentCode } = req.query;
+
+        if (!filterBy || !agentCode) {
+            return res.status(400).json({ message: 'filterBy and agentCode are required' });
+        }
+
+        // Call the model function
+        const data = await Report.getLoanDueDetails(filterBy, agentCode);
+
+        res.json({
+            message: 'Loan due details fetched successfully',
+            data
+        });
+
+    } catch (err) {
+        console.error('[CONTROLLER] getLoanDueDetails ERROR:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };

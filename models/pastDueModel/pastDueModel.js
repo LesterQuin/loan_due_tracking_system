@@ -1,3 +1,4 @@
+// pastDueModel.js
 import { sql, poolPromise } from '../../config/db.js'
 
 export const insertReports = async (reports) => {
@@ -60,6 +61,56 @@ export const getReports = async () => {
         return result.recordset;
     } catch (err) {
         console.error('GET REPORTS ERROR:', err);
+        throw err;
+    }
+};
+
+// Admin: fetch all reports
+export const getAllReports = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT TOP 1000 *
+            FROM LDTS.dbo.ldts_Past_Due_Reports
+            ORDER BY created_at DESC
+        `);
+    return result.recordset;
+};
+
+// Example: Department-specific reports
+export const getReportsByDepartment = async (departmentId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('departmentId', sql.Int, departmentId)
+        .query(`
+            SELECT TOP 1000 *
+            FROM LDTS.dbo.ldts_Past_Due_Reports
+            WHERE division_no = @departmentId
+            ORDER BY created_at DESC
+        `);
+    return result.recordset;
+};
+
+export const getLoanDueDetails = async (filterBy, agentCode) => {
+    try {
+        const pool = await poolPromise;
+
+        const result = await pool.request()
+            .input('filterBy', sql.VarChar(10), filterBy)
+            .input('agentCode', sql.VarChar(5), agentCode)
+            .query(`
+                SELECT TOP 1000 *
+                FROM [LDTS].[dbo].[CWMLOANDUEDET]
+                WHERE
+                    (@filterBy = 'SD'  AND SASDCDE = @agentCode)
+                    OR (@filterBy = 'MD'  AND SAMDCDE = @agentCode)
+                    OR (@filterBy = 'AGT' AND SAGTCDE = @agentCode)
+                ORDER BY SASDNAME, SAGTNAME, DLASTPAYDT DESC
+            `);
+
+        return result.recordset;
+    } catch (err) {
+        console.error('[MODEL] getLoanDueDetails ERROR:', err);
         throw err;
     }
 };
