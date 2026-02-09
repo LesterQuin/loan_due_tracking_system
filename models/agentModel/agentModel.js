@@ -184,6 +184,20 @@ export const logoutAgent = async (email) => {
         `);
 };
 
+export const clearTokens = async (agentId) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('agentId', sql.Int, agentId)
+        .query(`
+            UPDATE ldts_Agents
+            SET
+                accessToken = NULL,
+                refreshToken = NULL,
+                tokenExpiry = NULL
+            WHERE id = @agentId
+        `);
+};
+
 // Save refresh token in database
 export const saveTokens = async (agentId, accessToken, refreshToken, accessTokenExpiry) => {
     const pool = await poolPromise;
