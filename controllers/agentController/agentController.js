@@ -314,6 +314,22 @@ export const resendOTP = async (req, res) => {
             message: 'Agent not found.' 
         });
 
+        // OTP Validation
+        if (agent.mustVerifyOtp && agent.otpExpiresAt) {
+            const now = new Date();
+            const expiresAt = new Date(agent.otpExpiresAt);
+
+            if (now < expiresAt) {
+                const remainingSeconds = Math.ceil((expiresAt - now) / 1000);
+                
+                return res.status(429).json({
+                    status: 'false',
+                    message: `OTP is still active. Please wait ${remainingSeconds} seconds before requesting new one.`
+                });
+            }
+        }
+        
+        // Generate OTP
         const otp = generateOTP();
         await Agent.saveOTP(agent.id, otp); 
 
