@@ -1,22 +1,15 @@
-import { getDepartmentPermissions } from '../controllers/agentController/agentController.js';
-import * as Agent from '../models/agentModel/agentModel.js';
-
 export const requirePermission = (permissionKey) => {
-    return async (req, res, next) => {
+    return (req, res, next) => {
         try {
-            const agent = await Agent.getAgentByEmail(req.user.email);
-            if (!agent) {
-                return res.status(401).json({ message: 'Agent not found' });
+            if (!req.user || !req.user.permissions) {
+                return res.status(401).json({ message: 'Unauthorized' });
             }
 
-            const permissions = getDepartmentPermissions(agent.departmentId);
+            const permissions = req.user.permissions;
 
             if (!permissions[permissionKey]) {
                 return res.status(403).json({ message: 'Access denied' });
             }
-
-            // attach permissions if needed later
-            req.permissions = permissions;
 
             next();
         } catch (err) {
@@ -25,14 +18,3 @@ export const requirePermission = (permissionKey) => {
         }
     };
 };
-
-export const canExport = (req, res, next) => {
-    const { permissions } = req.user;
-
-    if (!permissions || !permissions.canExport) {
-        return res.status(403).json({ message: 'Export not allowed' });
-    }
-
-    next();
-};
-
