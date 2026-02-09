@@ -8,5 +8,6 @@ router.post('/reset-password', Controller.resetPassword);
 router.post('/verify-otp', Controller.verifyOTP);
 router.post('/resend-otp', Controller.resendOTP);
 router.post('/logout', Controller.logout);
+router.post('/refresh-token', Controller.refreshToken);
 
 export default router;
