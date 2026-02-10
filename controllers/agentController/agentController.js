@@ -1,4 +1,3 @@
-import { sql, poolPromise } from '../../config/db.js';
 import * as Agent from '../../models/agentModel/agentModel.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -58,85 +57,114 @@ export const register = async (req, res) => {
     try {
         let { firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber } = req.body;
 
-        // normalize optional fields
+        // normalize optional fields ("" → null)
         agentCode = agentCode?.trim() || null;
-        divisionId = divisionId || null;
         phoneNumber = phoneNumber?.trim() || null;
-        userType = userType?.trim() || null; 
+        userType = userType?.trim() || null;
+        departmentId = departmentId ? Number(departmentId) : null;
+        regionId = regionId ? Number(regionId) : null;
+        divisionId = divisionId ? Number(divisionId) : null;
 
-        if (!firstname || !lastname || !email || !departmentId || !regionId) {
-            return res.status(400).json({  
-                status: 'false', 
-                message: "Missing required fields" 
+        // ONLY truly required fields
+        if (!firstname || !lastname || !email) {
+            return res.status(400).json({
+                status: false,
+                message: "Missing required fields"
             });
         }
 
         const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i;
-        if (!emailRegex.test(email)) 
-            return res.status(400).json({ 
-                status: 'false', 
-                message: "Invalid domain address" 
-            });
-
-        // Validate userType only if provided
-        if (userType && !['Admin', 'MD', 'SD', 'FC'].includes(userType)) {
-            return res.status(400).json({ 
-                status: 'false', 
-                message: "Invalid userType." 
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                status: false,
+                message: "Invalid domain address"
             });
         }
 
-        const validDept = await Agent.isValidDepartment(departmentId);
-        if (!validDept) 
-            return res.status(400).json({ 
-                status: 'false', 
-                message: "Invalid departmentId" 
+        // Validate userType ONLY if provided
+        if (userType && !['Admin', 'MD', 'SD', 'FC'].includes(userType)) {
+            return res.status(400).json({
+                status: false,
+                message: "Invalid userType"
             });
+        }
 
-        const validReg = regionId ? await Agent.isValidRegion(regionId) : true;
-        if (!validReg) 
-            return res.status(400).json({ 
-                status: 'false', 
-                message: "Invalid regionId" 
-            });
+        // Validate department ONLY if provided
+        if (departmentId) {
+            const validDept = await Agent.isValidDepartment(departmentId);
+            if (!validDept) {
+                return res.status(400).json({
+                    status: false,
+                    message: "Invalid departmentId"
+                });
+            }
+        }
 
-        const validDiv = await Agent.isValidDivision(regionId, divisionId);
-        if (!validDiv) 
-            return res.status(400).json({ 
-                status: 'false', 
-                message: "Invalid division for the selected region."
-            });
+        // Validate region ONLY if provided
+        if (regionId) {
+            const validReg = await Agent.isValidRegion(regionId);
+            if (!validReg) {
+                return res.status(400).json({
+                    status: false,
+                    message: "Invalid regionId"
+                });
+            }
+        }
+
+        // Validate division ONLY if BOTH exist
+        if (regionId && divisionId) {
+            const validDiv = await Agent.isValidDivision(regionId, divisionId);
+            if (!validDiv) {
+                return res.status(400).json({
+                    status: false,
+                    message: "Invalid division for the selected region"
+                });
+            }
+        }
 
         const existing = await Agent.getAgentByEmail(email);
-        if (existing) 
-            return res.status(400).json({ 
-                status: 'false', 
-                message: "Email already registered." 
+        if (existing) {
+            return res.status(400).json({
+                status: false,
+                message: "Email already registered."
             });
+        }
 
-        // Create agent with temp password
         const newAgent = await Agent.createAgent(
-            firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber
+            firstname,
+            middlename,
+            lastname,
+            email,
+            agentCode,
+            departmentId,
+            regionId,
+            divisionId,
+            userType,
+            phoneNumber
         );
 
-        // Send temp password email
         await transporter.sendMail({
             from: `"LDTS System" <${process.env.SMTP_USER}>`,
             to: email,
             subject: 'Your Temporary Password',
-            html: tempPasswordTemplate(lastname, newAgent.tempPassword, process.env.APP_BASE_URL)
+            html: tempPasswordTemplate(
+                lastname,
+                newAgent.tempPassword,
+                process.env.APP_BASE_URL
+            )
         });
 
         res.status(201).json({
-            status: 'true',
+            status: true,
             message: "Agent registered, temporary password sent via email"
         });
 
     } catch (err) {
         console.error('REGISTRATION ERROR:', err);
-        res.status(500).json({ 
-            status: 'false', 
-            message: 'Server error', error: err.message 
+        res.status(500).json({
+            status: false,
+            message: 'Server error',
+            error: err.message
         });
     }
 };
@@ -147,21 +175,21 @@ export const login = async (req, res) => {
         const { email, password, newPassword } = req.body;
         if (!email || !password) 
             return res.status(400).json({  
-            status: 'false',
+            status: false,
             message: 'Email and Password required.' 
         });
 
         const agent = await Agent.getAgentByEmail(email);
         if (!agent) 
             return res.status(401).json({
-            status: 'false',
+            status: false,
             message: 'Invalid credentials.' 
         });
 
         const validPassword = await bcrypt.compare(password, agent.password);
         if (!validPassword) 
             return res.status(401).json({ 
-                status: 'false', 
+                status: false, 
                 message: 'Invalid credentials.' 
             });
 
@@ -169,7 +197,7 @@ export const login = async (req, res) => {
         if (agent.mustChangePassword) {
             if (!newPassword) 
                 return res.status(403).json({  
-                    status: 'false',
+                    status: false,
                     message: 'Password reset required. Please provide a new password.' 
                 });
 
@@ -177,7 +205,7 @@ export const login = async (req, res) => {
             const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
             if (!passwordRegex.test(newPassword)) 
                 return res.status(400).json({ 
-                    status: 'false',
+                    status: false,
                     message: 'New password must be 8+ chars, include upper, lower, number' 
                 });
 
@@ -198,14 +226,14 @@ export const login = async (req, res) => {
         });
 
         res.json({ 
-            status: 'true', 
+            status: true, 
             message: 'OTP sent to your email. Please verify to complete login.' 
         });
 
     } catch (err) {
         console.error('LOGIN ERROR:', err);
         res.status(500).json({ 
-            status: 'false', 
+            status: false, 
             message: 'Server error', error: err.message 
         });
     }
@@ -294,14 +322,14 @@ export const resetPassword = async (req, res) => {
 
         await Agent.updatePassword(email, newPassword);
         res.json({ 
-            status: 'true',  
+            status: true,  
             message: 'Password updated successfully.' 
         });
 
     } catch (err) {
         console.error('RESET PASSWORD ERROR:', err);
         res.status(500).json({ 
-            status: 'false',  
+            status: false,  
             message: 'Server error', error: err.message 
         });
     }
@@ -312,13 +340,13 @@ export const resendOTP = async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) return res.status(400).json({ 
-            status: 'false', 
+            status: false, 
             message: 'Email required.' 
         });
 
         const agent = await Agent.getAgentByEmail(email);
         if (!agent) return res.status(404).json({ 
-            status: 'false',  
+            status: false,  
             message: 'Agent not found.' 
         });
 
@@ -331,7 +359,7 @@ export const resendOTP = async (req, res) => {
                 const remainingSeconds = Math.ceil((expiresAt - now) / 1000);
                 
                 return res.status(429).json({
-                    status: 'false',
+                    status: false,
                     message: `OTP is still active. Please wait ${remainingSeconds} seconds before requesting new one.`
                 });
             }
@@ -349,14 +377,14 @@ export const resendOTP = async (req, res) => {
         });
 
         res.json({ 
-            status: 'true',  
+            status: true,  
             message: 'OTP resent successfully.' 
         });
 
     } catch (err) {
         console.error('RESEND OTP ERROR:', err);
         res.status(500).json({ 
-            status: 'false',  
+            status: false,  
             message: 'Server error', error: err.message 
         });
     }
@@ -369,21 +397,21 @@ export const logout = async (req, res) => {
 
         if (!email || !refreshToken) 
             return res.status(400).json({ 
-                status: 'false',  
+                status: false,  
                 message: "Email and refreshToken required" 
             });
 
         const agent = await Agent.getAgentByEmail(email);
         if (!agent) 
             return res.status(404).json({
-                status: 'false',  
+                status: false,  
                 message: "Agent not found" 
             });
 
         // Validate refresh token
         if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
             return res.status(401).json({
-                status: 'false',
+                status: false,
                 message: 'Invalid refresh token'
             });
         }
@@ -395,14 +423,14 @@ export const logout = async (req, res) => {
         await Agent.logoutAgent(email);
 
         res.json({
-            status: 'true', 
+            status: true, 
             message: "Logged out successfully" 
         });
 
     } catch (err) {
         console.error("LOGOUT ERROR:", err);
         res.status(500).json({ 
-            status: 'false', 
+            status: false, 
             message: "Server error", error: err.message 
         });
     }
@@ -415,7 +443,7 @@ export const refreshToken = async (req, res) => {
 
         if (!refreshToken) {
             return res.status(400).json({
-                status: 'false',
+                status: false,
                 message: 'Refresh token required.'
             });
         }
@@ -426,7 +454,7 @@ export const refreshToken = async (req, res) => {
             decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
         } catch (err) {
             return res.status(401).json({
-                status: 'false',
+                status: false,
                 message: 'Invalid or expired refresh token.'
             });
         }
@@ -435,7 +463,7 @@ export const refreshToken = async (req, res) => {
         const agent = await Agent.getAgentByEmail(decoded.email);
         if (!agent) {
             return res.status(404).json({
-                status: 'false',
+                status: false,
                 message: 'Agent not found.'
             });
         }
@@ -443,7 +471,7 @@ export const refreshToken = async (req, res) => {
         // Match token
         if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
             return res.status(401).json({
-                status: 'false',
+                status: false,
                 message: 'Refresh token mismatch.'
             });
         }
@@ -480,7 +508,7 @@ export const refreshToken = async (req, res) => {
         );
 
         res.json({
-            status: 'true',
+            status: true,
             message: 'Access token refreshed.',
             accessToken: newAccessToken,
             user: {
@@ -505,7 +533,7 @@ export const refreshToken = async (req, res) => {
     } catch (err) {
         console.error("REFRESH TOKEN ERROR:", err);
         res.status(500).json({ 
-            status: 'false', 
+            status: false, 
             message: "Server error", error: err.message 
         });
     }
