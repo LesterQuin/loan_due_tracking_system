@@ -1,14 +1,28 @@
-export const requirePermission = (permissionKey) => {
+import { getDepartmentPermissions } from '../utils/permissions.js'; 
+
+export const requirePermission = (permissionKeys) => {
     return (req, res, next) => {
         try {
-            if (!req.user || !req.user.permissions) {
-                return res.status(401).json({ message: 'Unauthorized' });
+            const user = req.user;
+            if (!user) return res.status(401).json({ message: 'Unauthorized: no user info' });
+
+            const permissions = getDepartmentPermissions(user);
+
+            if (permissions.viewOnly) {
+                return res.status(403).json({ message: 'Access denied: view-only user' });
             }
 
-            const permissions = req.user.permissions;
+            const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
+            const hasPermission = keys.some(key => permissions[key]);
 
-            if (!permissions[permissionKey]) {
-                return res.status(403).json({ message: 'Access denied' });
+            if (!hasPermission) {
+                return res.status(403).json({ message: 'Access denied: insufficient permissions' });
+            }
+
+            if (req.params.departmentId && !['Admin', 'MD'].includes(user.userType)) {
+                if (user.departmentId != req.params.departmentId) {
+                    return res.status(403).json({ message: 'Access denied: wrong department' });
+                }
             }
 
             next();

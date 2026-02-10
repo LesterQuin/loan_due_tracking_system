@@ -70,9 +70,39 @@ export const getAllReports = async () => {
     const pool = await poolPromise;
     const result = await pool.request()
         .query(`
-            SELECT TOP 1000 *
+            SELECT TOP 1000 [id]
+                ,[loan_account_no]
+                ,[disb_date]
+                ,[funder]
+                ,[tcaa]
+                ,[written_off]
+                ,[smrd_coll_agency]
+                ,[region]
+                ,[company]
+                ,[division_no]
+                ,[station_no]
+                ,[employee_id]
+                ,[client_name]
+                ,[pn_value]
+                ,[principal_value]
+                ,[amort_amt]
+                ,[out_prin_bal]
+                ,[last_payment_date]
+                ,[first_due_date]
+                ,[maturity_date]
+                ,[past_due]
+                ,[orb]
+                ,[nfc]
+                ,[penalty]
+                ,[total_orb]
+                ,[interest_discount_1]
+                ,[interest_discount_2]
+                ,[discounted_orb_1]
+                ,[discounted_orb_2]
+                ,[report_as_of]
+                ,[created_at]
             FROM LDTS.dbo.ldts_Past_Due_Reports
-            ORDER BY created_at DESC
+            ORDER BY id DESC
         `);
     return result.recordset;
 };

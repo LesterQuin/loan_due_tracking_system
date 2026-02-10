@@ -156,15 +156,27 @@ export const getAdminReports = async (req, res) => {
 // Department view
 export const getDepartmentReports = async (req, res) => {
     try {
-        const { departmentId } = req.user; // set from JWT
-        const reports = await Report.getReportsByDepartment(departmentId);
+        const userDeptId = req.user.departmentId; // from JWT
+        const userType = req.user.userType;
 
-        console.log('[DEPARTMENT VIEW] Records fetched:', reports.length);
+        if (!userDeptId) return res.status(400).json({ message: 'User has no department assigned' });
+
+        // Optional: Admin/MD can fetch all departments
+        let deptIdForQuery = userDeptId;
+        if (['Admin', 'MD'].includes(userType) && req.query.departmentId) {
+            // allow Admin/MD to specify a department via query param
+            deptIdForQuery = parseInt(req.query.departmentId);
+        }
+
+        const reports = await Report.getAllReports(deptIdForQuery);
+
+        console.log(`[DEPARTMENT VIEW] User ${req.user.id} fetched ${reports.length} records`);
 
         res.json({
             message: 'Department reports fetched successfully',
             data: reports
         });
+
     } catch (err) {
         console.error('[DEPARTMENT VIEW] ERROR:', err);
         res.status(500).json({ message: 'Server error', error: err.message });

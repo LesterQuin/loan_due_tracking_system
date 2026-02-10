@@ -14,7 +14,7 @@ export const createAgent = async (firstname, middlename, lastname, email, agentC
         .input('lastname', sql.VarChar, lastname)
         .input('email', sql.VarChar, email)
         .input('agentCode', sql.VarChar, agentCode || null)
-        .input('userType', sql.VarChar, userType)
+        .input('userType', sql.VarChar, userType || null)
         .input('departmentId', sql.Int, departmentId)
         .input('regionId', sql.Int, regionId)
         .input('divisionId', sql.Int, divisionId || null)

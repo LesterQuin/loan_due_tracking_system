@@ -25,28 +25,28 @@ const transporter = nodemailer.createTransport({
 // Helper: generate random OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+// ========================= PERMISSIONS =========================
 export const getDepartmentPermissions = (agent) => {
     // Priority: userType overrides department
-    switch (agent.userType) {
-        case 'Admin':
-            return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
-        case 'MD':
-            return { canUpload: true, canImport: true, canExport: true, viewOnly: false }; 
-        case 'SD':
-            return { canUpload: false, canImport: false, canExport: true, viewOnly: false }; 
-        case 'FC':
-            return { canUpload: false, canImport: false, canExport: false, viewOnly: true }; 
-        default:
-            break;
+    if (agent.userType) {
+        switch (agent.userType) {
+            case 'Admin':
+            case 'MD':
+                return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
+            case 'SD':
+                return { canUpload: false, canImport: false, canExport: true, viewOnly: false };
+            case 'FC':
+                return { canUpload: false, canImport: false, canExport: false, viewOnly: true };
+        }
     }
 
-    // Fallback based on departmentId
+    // Fallback based on numeric departmentId
     switch (agent.departmentId) {
-        case 1:
-            return { canUpload: true, canImport: false, canExport: false, viewOnly: false };
-        case 2:
-            return { canUpload: false, canImport: true, canExport: true, viewOnly: false };
-        case 3:
+        case 1: // PLA
+            return { canUpload: true, canImport: true, canExport: false, viewOnly: true };
+        case 2: // LMG
+            return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
+        case 3: // OP
             return { canUpload: false, canImport: false, canExport: false, viewOnly: true };
         default:
             return { canUpload: false, canImport: false, canExport: false, viewOnly: true };
@@ -58,13 +58,14 @@ export const register = async (req, res) => {
     try {
         let { firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber } = req.body;
 
-        // normalize optimal fields
+        // normalize optional fields
         agentCode = agentCode?.trim() || null;
         divisionId = divisionId || null;
         phoneNumber = phoneNumber?.trim() || null;
+        userType = userType?.trim() || null; 
 
-        if (!firstname || !lastname || !email || !departmentId || !regionId || !userType){
-        return res.status(400).json({  
+        if (!firstname || !lastname || !email || !departmentId || !regionId) {
+            return res.status(400).json({  
                 status: 'false', 
                 message: "Missing required fields" 
             });
@@ -77,11 +78,13 @@ export const register = async (req, res) => {
                 message: "Invalid domain address" 
             });
 
-        if (!['Admin', 'MD', 'SD', 'FC'].includes(userType)) 
+        // Validate userType only if provided
+        if (userType && !['Admin', 'MD', 'SD', 'FC'].includes(userType)) {
             return res.status(400).json({ 
                 status: 'false', 
                 message: "Invalid userType." 
             });
+        }
 
         const validDept = await Agent.isValidDepartment(departmentId);
         if (!validDept) 
@@ -101,7 +104,7 @@ export const register = async (req, res) => {
         if (!validDiv) 
             return res.status(400).json({ 
                 status: 'false', 
-                message: "Invalid division for the select region."
+                message: "Invalid division for the selected region."
             });
 
         const existing = await Agent.getAgentByEmail(email);
@@ -113,15 +116,15 @@ export const register = async (req, res) => {
 
         // Create agent with temp password
         const newAgent = await Agent.createAgent(
-        firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber
+            firstname, middlename, lastname, email, agentCode, departmentId, regionId, divisionId, userType, phoneNumber
         );
 
         // Send temp password email
         await transporter.sendMail({
-        from: `"LDTS System" <${process.env.SMTP_USER}>`,
-        to: email,
-        subject: 'Your Temporary Password',
-        html: tempPasswordTemplate(lastname, newAgent.tempPassword, process.env.APP_BASE_URL)
+            from: `"LDTS System" <${process.env.SMTP_USER}>`,
+            to: email,
+            subject: 'Your Temporary Password',
+            html: tempPasswordTemplate(lastname, newAgent.tempPassword, process.env.APP_BASE_URL)
         });
 
         res.status(201).json({

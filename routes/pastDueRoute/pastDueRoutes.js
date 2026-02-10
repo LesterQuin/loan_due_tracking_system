@@ -14,10 +14,10 @@ router.post('/upload-excel', authenticateJWT, requirePermission('canUpload'), up
 router.get('/export-excel', authenticateJWT, requirePermission('canExport'), Controller.exportExcel);
 
 // Admin-only view
-router.get('/admin-view', Controller.getAdminReports);
+router.get('/admin-view',  authenticateJWT, requirePermission('canExport', 'canImport', 'viewOnly'), Controller.getAdminReports);
 
 // Department view (user type != Admin)
-router.get('/department-view', Controller.getDepartmentReports);
+router.get('/department-view/', authenticateJWT, requirePermission(['canExport', 'canImport', 'viewOnly']), Controller.getDepartmentReports);
 
 //
 router.get('/load-due-details', Controller.getLoanDueDetails)
