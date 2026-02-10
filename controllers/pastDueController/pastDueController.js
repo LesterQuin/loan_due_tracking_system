@@ -156,21 +156,31 @@ export const getAdminReports = async (req, res) => {
 // Department view
 export const getDepartmentReports = async (req, res) => {
     try {
-        const userDeptId = req.user.departmentId; // from JWT
-        const userType = req.user.userType;
+        const { departmentId: userDeptId, userType, id: userId } = req.user;
 
-        if (!userDeptId) return res.status(400).json({ message: 'User has no department assigned' });
-
-        // Optional: Admin/MD can fetch all departments
-        let deptIdForQuery = userDeptId;
-        if (['Admin', 'MD'].includes(userType) && req.query.departmentId) {
-            // allow Admin/MD to specify a department via query param
-            deptIdForQuery = parseInt(req.query.departmentId);
+        if (!userDeptId) {
+            return res.status(400).json({ message: 'User has no department assigned' });
         }
 
-        const reports = await Report.getAllReports(deptIdForQuery);
+        // Default: user's own department
+        let deptIdForQuery = Number(userDeptId);
 
-        console.log(`[DEPARTMENT VIEW] User ${req.user.id} fetched ${reports.length} records`);
+        // Admin / MD override
+        if (['Admin', 'MD'].includes(userType) && req.query.departmentId) {
+            const requestedDept = Number(req.query.departmentId);
+
+            if (Number.isNaN(requestedDept)) {
+                return res.status(400).json({ message: 'Invalid departmentId query parameter' });
+            }
+
+            deptIdForQuery = requestedDept;
+        }
+
+        const reports = await Report.getReportsByDepartment(deptIdForQuery);
+
+        console.log(
+            `[DEPARTMENT VIEW] User ${userId} fetched ${reports.length} records (dept ${deptIdForQuery})`
+        );
 
         res.json({
             message: 'Department reports fetched successfully',
@@ -179,7 +189,10 @@ export const getDepartmentReports = async (req, res) => {
 
     } catch (err) {
         console.error('[DEPARTMENT VIEW] ERROR:', err);
-        res.status(500).json({ message: 'Server error', error: err.message });
+        res.status(500).json({
+            message: 'Server error',
+            error: err.message
+        });
     }
 };
 

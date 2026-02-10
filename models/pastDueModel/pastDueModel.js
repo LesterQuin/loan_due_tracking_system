@@ -70,6 +70,19 @@ export const getAllReports = async () => {
     const pool = await poolPromise;
     const result = await pool.request()
         .query(`
+            SELECT TOP 1000 *
+            FROM LDTS.dbo.ldts_Past_Due_Reports
+            ORDER BY id DESC
+        `);
+    return result.recordset;
+};
+
+// Example: Department-specific reports
+export const getReportsByDepartment = async (departmentId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('departmentId', sql.Int, departmentId)
+        .query(`
             SELECT TOP 1000 [id]
                 ,[loan_account_no]
                 ,[disb_date]
@@ -103,20 +116,6 @@ export const getAllReports = async () => {
                 ,[created_at]
             FROM LDTS.dbo.ldts_Past_Due_Reports
             ORDER BY id DESC
-        `);
-    return result.recordset;
-};
-
-// Example: Department-specific reports
-export const getReportsByDepartment = async (departmentId) => {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input('departmentId', sql.Int, departmentId)
-        .query(`
-            SELECT TOP 1000 *
-            FROM LDTS.dbo.ldts_Past_Due_Reports
-            WHERE division_no = @departmentId
-            ORDER BY created_at DESC
         `);
     return result.recordset;
 };

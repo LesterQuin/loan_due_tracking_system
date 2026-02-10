@@ -263,7 +263,7 @@ export const verifyOTP = async (req, res) => {
                 lastname: agent.lastname,
                 agentCode: agent.agentCode,
                 phoneNumber: agent.phoneNumber,
-                userType: agent.userType,
+                userType: agent.userType || null,
                 departmentId: agent.departmentId,
                 departmentName: department?.departmentName || null,
                 regionId: agent.regionId,
