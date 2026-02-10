@@ -1,5 +1,5 @@
 // templates/tempPasswordTemplate.js
-export const tempPasswordTemplate = (firstname, tempPassword, baseUrl) => {
+export const tempPasswordTemplate = (lastname, tempPassword, baseUrl) => {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -22,7 +22,7 @@ export const tempPasswordTemplate = (firstname, tempPassword, baseUrl) => {
         <!-- Content -->
         <tr>
             <td style="padding:30px 25px;">
-            <p style="margin:0 0 20px; font-size:16px;">Hello, <strong>${firstname}</strong></p>
+            <p style="margin:0 0 20px; font-size:16px;">Hello Mr/Mrs, <strong>${lastname}</strong></p>
             <p style="margin:0 0 25px; font-size:16px;">
                 Your temporary password is:
             </p>

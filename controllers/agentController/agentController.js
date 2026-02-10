@@ -121,7 +121,7 @@ export const register = async (req, res) => {
         from: `"LDTS System" <${process.env.SMTP_USER}>`,
         to: email,
         subject: 'Your Temporary Password',
-        html: tempPasswordTemplate(firstname, newAgent.tempPassword, process.env.APP_BASE_URL)
+        html: tempPasswordTemplate(lastname, newAgent.tempPassword, process.env.APP_BASE_URL)
         });
 
         res.status(201).json({
@@ -191,7 +191,7 @@ export const login = async (req, res) => {
             from: `"LDTS System" <${process.env.SMTP_USER}>`,
             to: email,
             subject: 'Your Login OTP',
-            html: otpTemplate(agent.firstname, otp)
+            html: otpTemplate(agent.lastname, otp)
         });
 
         res.json({ 
@@ -342,7 +342,7 @@ export const resendOTP = async (req, res) => {
         from: `"LDTS System" <${process.env.SMTP_USER}>`,
         to: email,
         subject: 'Your Login OTP',
-        html: otpTemplate(agent.firstname, otp)
+        html: otpTemplate(agent.lastname, otp)
         });
 
         res.json({ 
