@@ -4,12 +4,14 @@ import dotenv from "dotenv";
 import destinationRoutes from "./routes/destinationRoute/destinationRoutes.js";
 import agentRoutes from "./routes/agentRoute/agentRoutes.js"
 import pastDueRoutes from "./routes/pastDueRoute/pastDueRoutes.js"
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 
 app.use("/api/destinations", destinationRoutes);
 app.use("/api/agents", agentRoutes);

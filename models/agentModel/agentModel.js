@@ -215,3 +215,11 @@ export const saveTokens = async (agentId, accessToken, refreshToken, accessToken
             WHERE id = @agentId
         `);
 };
+
+export const getAgentByToken = async (refreshToken) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('refreshToken', sql.VarChar, refreshToken)
+        .query(`SELECT * FROM ldts_Agents WHERE refreshToken = @refreshToken`);
+    return result.recordset[0];
+};

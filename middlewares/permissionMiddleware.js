@@ -4,29 +4,26 @@ export const requirePermission = (permissionKeys = []) => {
     return (req, res, next) => {
         try {
             const user = req.user;
-            if (!user) {
-                return res.status(401).json({ message: 'Unauthorized: no user info' });
-            }
+            if (!user) return res.status(401).json({ message: 'Unauthorized: no user info' });
 
             const permissions = getDepartmentPermissions(user);
-
             const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
 
-            // ✅ allow if user has at least ONE of the allowed permissions
-            const hasPermission = keys.some(key => permissions[key] === true);
-
-            if (!hasPermission) {
-                return res.status(403).json({
-                    message: 'Access denied: insufficient permissions'
-                });
+            // ❌ Block if user is view-only and trying restricted actions
+            if (permissions.viewOnly && keys.some(k => k !== 'viewOnly')) {
+                return res.status(403).json({ message: 'Access denied: view-only user' });
             }
 
-            // 🔒 Optional department safety (only if route has param)
+            // ✅ Check if user has at least one of the required permissions
+            const hasPermission = keys.some(key => permissions[key] === true);
+            if (!hasPermission) {
+                return res.status(403).json({ message: 'Access denied: insufficient permissions' });
+            }
+
+            // 🔒 Optional: department validation for routes with params
             if (req.params.departmentId && !['Admin', 'MD'].includes(user.userType)) {
                 if (Number(user.departmentId) !== Number(req.params.departmentId)) {
-                    return res.status(403).json({
-                        message: 'Access denied: wrong department'
-                    });
+                    return res.status(403).json({ message: 'Access denied: wrong department' });
                 }
             }
 

@@ -26,20 +26,23 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 
 // ========================= PERMISSIONS =========================
 export const getDepartmentPermissions = (agent) => {
-    // Priority: userType overrides department
+    // ✅ Priority: userType
     if (agent.userType) {
         switch (agent.userType) {
             case 'Admin':
+                return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
             case 'MD':
                 return { canUpload: true, canImport: true, canExport: true, viewOnly: false };
             case 'SD':
                 return { canUpload: false, canImport: false, canExport: true, viewOnly: false };
             case 'FC':
-                return { canUpload: false, canImport: false, canExport: false, viewOnly: true };
+                return { canUpload: false, canImport: false, canExport: false, viewOnly: false, canTransaction: true };
+            default:
+                break;
         }
     }
 
-    // Fallback based on numeric departmentId
+    // 🔹 Fallback based on numeric departmentId
     switch (agent.departmentId) {
         case 1: // PLA
             return { canUpload: true, canImport: true, canExport: false, viewOnly: true };
@@ -266,6 +269,13 @@ export const verifyOTP = async (req, res) => {
         // Save Access Token
         const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
         await Agent.saveTokens(agent.id, accessToken, refreshToken, accessTokenExpiry);
+        
+        res.cookie('ldtsAuth', refreshToken, { 
+            httpOnly: true,
+            secure: true, // secure only in production
+            sameSite: 'None',  // set to 'Lax' if same-site frontend
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
 
         const permissions = getDepartmentPermissions(agent);
         const scope = resolveScope(agent);
@@ -439,7 +449,7 @@ export const logout = async (req, res) => {
 // ========================= REFRESH TOKEN =========================
 export const refreshToken = async (req, res) => {
     try {
-        const { refreshToken } = req.body;
+        const refreshToken = req.cookies?.ldtsAuth;
 
         if (!refreshToken) {
             return res.status(400).json({
@@ -448,19 +458,19 @@ export const refreshToken = async (req, res) => {
             });
         }
 
-        // Verify refresh token 
+        // Verify refresh token
         let decoded;
         try {
             decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-        } catch (err) {
+        } catch {
             return res.status(401).json({
                 status: false,
                 message: 'Invalid or expired refresh token.'
             });
         }
 
-        // Fetch Agent
-        const agent = await Agent.getAgentByEmail(decoded.email);
+        // Fetch agent
+        const agent = await Agent.getAgentByToken(refreshToken);
         if (!agent) {
             return res.status(404).json({
                 status: false,
@@ -468,7 +478,7 @@ export const refreshToken = async (req, res) => {
             });
         }
 
-        // Match token
+        // Compare stored token
         if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
             return res.status(401).json({
                 status: false,
@@ -481,11 +491,11 @@ export const refreshToken = async (req, res) => {
         const departments = await Agent.getDepartments();
         const divisions = await Agent.getDivisionsByRegion(agent.regionId);
 
-        const region = regions.find(r => r.id === agent.regionId) || { regionName: null };
-        const department = departments.find(d => d.id === agent.departmentId) || { departmentName: null };
-        const division = divisions.find(d => d.id === agent.divisionId) || { divisionName: null };
+        const region = regions.find(r => r.id === agent.regionId);
+        const department = departments.find(d => d.id === agent.departmentId);
+        const division = divisions.find(d => d.id === agent.divisionId);
 
-        // Generate new access token
+        // New access token
         const payload = {
             id: agent.id,
             email: agent.email,
@@ -507,6 +517,13 @@ export const refreshToken = async (req, res) => {
             accessTokenExpiry
         );
 
+        res.cookie('ldtsAuth', refreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'None',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
         res.json({
             status: true,
             message: 'Access token refreshed.',
@@ -526,15 +543,14 @@ export const refreshToken = async (req, res) => {
                 regionName: region?.regionName || null,
                 divisionId: agent.divisionId,
                 divisionName: division?.divisionName || null
-            },
+            }
         });
 
-        
     } catch (err) {
         console.error("REFRESH TOKEN ERROR:", err);
-        res.status(500).json({ 
-            status: false, 
-            message: "Server error", error: err.message 
+        res.status(500).json({
+            status: false,
+            message: "Server error"
         });
     }
-}
+};

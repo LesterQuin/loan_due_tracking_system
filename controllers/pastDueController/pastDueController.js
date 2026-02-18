@@ -158,12 +158,12 @@ export const getDepartmentReports = async (req, res) => {
     try {
         const { departmentId: userDeptId, userType, id: userId } = req.user;
 
-        if (!userDeptId) {
+        if (!userDeptId && !['Admin', 'MD'].includes(userType)) {
             return res.status(400).json({ message: 'User has no department assigned' });
         }
 
         // Default: user's own department
-        let deptIdForQuery = Number(userDeptId);
+        let deptIdForQuery = Number(userDeptId || 0); 
 
         // Admin / MD override
         if (['Admin', 'MD'].includes(userType) && req.query.departmentId) {

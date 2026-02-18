@@ -11,15 +11,48 @@ const upload = multer();
 router.post('/upload-excel', authenticateJWT, requirePermission('canUpload'), upload.single('file'), Controller.uploadExcel);
 
 // Export → Department 2
-router.get('/export-excel', authenticateJWT, requirePermission('canExport'), Controller.exportExcel);
+router.get('/export-excel', authenticateJWT, requirePermission(['canExport', 'canImport']), Controller.exportExcel);
 
 // Admin-only view
-router.get('/admin-view',  authenticateJWT, requirePermission('canExport', 'canImport', 'viewOnly'), Controller.getAdminReports);
+router.get('/admin-view',  authenticateJWT, requirePermission(['canExport', 'canImport', 'viewOnly']), Controller.getAdminReports);
 
-// Department view (user type != Admin)
-router.get('/department-view/', authenticateJWT, requirePermission(['canExport', 'canImport', 'viewOnly']), Controller.getDepartmentReports);
+// View → Department 3
+router.get('/department-view/', authenticateJWT, requirePermission('viewOnly'), Controller.getDepartmentReports);
 
 //
 router.get('/load-due-details', Controller.getLoanDueDetails)
+
+// // Department view: view-only allowed
+// router.get(
+//     '/department-view',
+//     authenticateJWT,
+//     requirePermission(['viewOnly', 'canUpload', 'canImport', 'canExport']),
+//     Controller.getDepartmentReports
+// );
+
+// // Upload Excel: only PLA/LMG
+// router.post(
+//     '/upload-excel',
+//     authenticateJWT,
+//     requirePermission(['canUpload']),
+//     Controller.uploadExcel
+// );
+
+// // Export Excel: only LMG, MD, Admin
+// router.get(
+//     '/export-excel',
+//     authenticateJWT,
+//     requirePermission(['canExport']),
+//     Controller.exportExcel
+// );
+
+// // Transaction: only FC
+// router.post(
+//     '/transaction',
+//     authenticateJWT,
+//     requirePermission(['canTransaction']),
+//     Controller.handleTransaction
+// );
+
 
 export default router;
