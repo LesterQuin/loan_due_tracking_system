@@ -20,7 +20,7 @@ router.get('/admin-view',  authenticateJWT, requirePermission(['canExport', 'can
 router.get('/department-view/', authenticateJWT, requirePermission('viewOnly'), Controller.getDepartmentReports);
 
 //
-router.get('/load-due-details', Controller.getLoanDueDetails)
+router.get('/load-due-details', authenticateJWT, requirePermission('viewOnly'), Controller.getLoanDueDetails)
 
 // // Department view: view-only allowed
 // router.get(

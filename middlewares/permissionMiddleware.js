@@ -9,10 +9,10 @@ export const requirePermission = (permissionKeys = []) => {
             const permissions = getDepartmentPermissions(user);
             const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
 
-            // ❌ Block if user is view-only and trying restricted actions
-            if (permissions.viewOnly && keys.some(k => k !== 'viewOnly')) {
-                return res.status(403).json({ message: 'Access denied: view-only user' });
-            }
+            // // ❌ Block if user is view-only and trying restricted actions
+            // if (permissions.viewOnly && keys.some(k => k !== 'viewOnly')) {
+            //     return res.status(403).json({ message: 'Access denied: view-only user' });
+            // }
 
             // ✅ Check if user has at least one of the required permissions
             const hasPermission = keys.some(key => permissions[key] === true);

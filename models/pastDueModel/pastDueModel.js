@@ -108,8 +108,14 @@ export const getAllReports = async () => {
 };
 
 // Example: Department-specific reports
-export const getReportsByDepartment = async () => {
+export const getReportsByDepartment = async (departmentId) => {
     const pool = await poolPromise;
+    
+    // Note: The ldts_Past_Due_Reports table doesn't have a department column.
+    // The departmentId parameter is accepted for compatibility with the controller,
+    // but currently returns all records since the data doesn't have department info.
+    // If you need department filtering, you'll need to add a department column to the table.
+    
     const result = await pool.request()
         .query(`
             SELECT TOP 1000 [id]

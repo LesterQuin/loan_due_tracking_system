@@ -243,15 +243,89 @@ export const login = async (req, res) => {
 };
 
 // ========================= VERIFY OTP =========================
+// export const verifyOTP = async (req, res) => {
+//     try {
+//         const { email, otp } = req.body;
+//         if (!email || !otp) 
+//             return res.status(400).json({ message: 'Email and OTP required.' });
+
+//         const agent = await Agent.getAgentByEmail(email);
+//         if (!agent) 
+//             return res.status(401).json({ message: 'Invalid credentials.' });
+
+//         // Verify OTP
+//         const isValid = await Agent.verifyOTP(agent.id, otp);
+//         if (!isValid) 
+//             return res.status(401).json({ message: 'Invalid or expired OTP.' });
+
+//         // Clear OTP
+//         await Agent.clearOtp(agent.id);
+
+//         // Generate tokens
+//         const payload = { id: agent.id, email: agent.email, userType: agent.userType };
+//         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+//         const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
+        
+//         // Save Access Token
+//         const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+//         await Agent.saveTokens(agent.id, accessToken, refreshToken, accessTokenExpiry);
+        
+//         res.cookie('ldtsAuth', refreshToken, { 
+//             httpOnly: true,
+//             secure: true, // secure only in production
+//             sameSite: 'None',  // set to 'Lax' if same-site frontend
+//             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+//         });
+
+//         const permissions = getDepartmentPermissions(agent);
+//         const scope = resolveScope(agent);
+
+//         const regions = await Agent.getRegions();
+//         const departments = await Agent.getDepartments();
+//         const divisions = await Agent.getDivisionsByRegion(agent.regionId); 
+
+//         // Fetch reference data
+//         const region = regions.find(r => r.id === agent.regionId);
+//         const department = departments.find(d => d.id === agent.departmentId);
+//         const division = divisions.find(d => d.id === agent.divisionId);
+
+//         res.json({ 
+//             message: 'Login successful',
+//             accessToken,
+//             refreshToken,
+//             user: {
+//                 id: agent.id,
+//                 email: agent.email,
+//                 firstname: agent.firstname,
+//                 middlename: agent.middlename,
+//                 lastname: agent.lastname,
+//                 agentCode: agent.agentCode,
+//                 phoneNumber: agent.phoneNumber,
+//                 userType: agent.userType || null,
+//                 departmentId: agent.departmentId,
+//                 departmentName: department?.departmentName || null,
+//                 regionId: agent.regionId,
+//                 regionName: region?.regionName || null,
+//                 divisionId: agent.divisionId,
+//                 divisionName: division?.divisionName || null
+//             },
+//             permissions,
+//             scope
+//         });
+
+//     } catch (err) {
+//         console.error('VERIFY OTP ERROR:', err);
+//         res.status(500).json({ message: 'Server error', error: err.message });
+//     }
+// };
+
 export const verifyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        if (!email || !otp) 
-            return res.status(400).json({ message: 'Email and OTP required.' });
+        if (!email || !otp)  return res.status(400).json({ message: 'Email and OTP required.' });
 
         const agent = await Agent.getAgentByEmail(email);
-        if (!agent) 
-            return res.status(401).json({ message: 'Invalid credentials.' });
+        if (!agent)  return res.status(401).json({ message: 'Invalid credentials.' });
 
         // Verify OTP
         const isValid = await Agent.verifyOTP(agent.id, otp);
@@ -269,16 +343,13 @@ export const verifyOTP = async (req, res) => {
         // Save Access Token
         const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
         await Agent.saveTokens(agent.id, accessToken, refreshToken, accessTokenExpiry);
-        
+
         res.cookie('ldtsAuth', refreshToken, { 
             httpOnly: true,
-            secure: true, // secure only in production
-            sameSite: 'None',  // set to 'Lax' if same-site frontend
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            secure: true, 
+            sameSite: 'None',  
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         });
-
-        const permissions = getDepartmentPermissions(agent);
-        const scope = resolveScope(agent);
 
         const regions = await Agent.getRegions();
         const departments = await Agent.getDepartments();
@@ -289,6 +360,9 @@ export const verifyOTP = async (req, res) => {
         const department = departments.find(d => d.id === agent.departmentId);
         const division = divisions.find(d => d.id === agent.divisionId);
 
+        const permissions = getDepartmentPermissions(agent);
+        const scope = resolveScope(agent);
+        console.log("Agent: ", agent)
         res.json({ 
             message: 'Login successful',
             accessToken,
@@ -447,10 +521,119 @@ export const logout = async (req, res) => {
 };
 
 // ========================= REFRESH TOKEN =========================
+// export const refreshToken = async (req, res) => {
+//     try {
+//         const refreshToken = req.cookies?.ldtsAuth;
+
+//         if (!refreshToken) {
+//             return res.status(400).json({
+//                 status: false,
+//                 message: 'Refresh token required.'
+//             });
+//         }
+
+//         // Verify refresh token
+//         let decoded;
+//         try {
+//             decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+//         } catch {
+//             return res.status(401).json({
+//                 status: false,
+//                 message: 'Invalid or expired refresh token.'
+//             });
+//         }
+
+//         // Fetch agent
+//         const agent = await Agent.getAgentByToken(refreshToken);
+//         if (!agent) {
+//             return res.status(404).json({
+//                 status: false,
+//                 message: 'Agent not found.'
+//             });
+//         }
+
+//         // Compare stored token
+//         if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
+//             return res.status(401).json({
+//                 status: false,
+//                 message: 'Refresh token mismatch.'
+//             });
+//         }
+
+//         // Fetch reference data
+//         const regions = await Agent.getRegions();
+//         const departments = await Agent.getDepartments();
+//         const divisions = await Agent.getDivisionsByRegion(agent.regionId);
+
+//         const region = regions.find(r => r.id === agent.regionId);
+//         const department = departments.find(d => d.id === agent.departmentId);
+//         const division = divisions.find(d => d.id === agent.divisionId);
+
+//         // New access token
+//         const payload = {
+//             id: agent.id,
+//             email: agent.email,
+//             userType: agent.userType
+//         };
+
+//         const newAccessToken = jwt.sign(
+//             payload,
+//             process.env.JWT_SECRET,
+//             { expiresIn: process.env.JWT_EXPIRES_IN }
+//         );
+
+//         const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+
+//         await Agent.saveTokens(
+//             agent.id,
+//             newAccessToken,
+//             refreshToken,
+//             accessTokenExpiry
+//         );
+
+//         res.cookie('ldtsAuth', refreshToken, {
+//             httpOnly: true,
+//             secure: true,
+//             sameSite: 'None',
+//             maxAge: 7 * 24 * 60 * 60 * 1000
+//         });
+
+//         res.json({
+//             status: true,
+//             message: 'Access token refreshed.',
+//             accessToken: newAccessToken,
+//             user: {
+//                 id: agent.id,
+//                 email: agent.email,
+//                 firstname: agent.firstname,
+//                 middlename: agent.middlename,
+//                 lastname: agent.lastname,
+//                 agentCode: agent.agentCode,
+//                 phoneNumber: agent.phoneNumber,
+//                 userType: agent.userType,
+//                 departmentId: agent.departmentId,
+//                 departmentName: department?.departmentName || null,
+//                 regionId: agent.regionId,
+//                 regionName: region?.regionName || null,
+//                 divisionId: agent.divisionId,
+//                 divisionName: division?.divisionName || null
+//             }
+//         });
+
+//     } catch (err) {
+//         console.error("REFRESH TOKEN ERROR:", err);
+//         res.status(500).json({
+//             status: false,
+//             message: "Server error"
+//         });
+//     }
+// };
+
 export const refreshToken = async (req, res) => {
     try {
+        // const { refreshToken } = req.body;
         const refreshToken = req.cookies?.ldtsAuth;
-
+        
         if (!refreshToken) {
             return res.status(400).json({
                 status: false,
@@ -458,18 +641,6 @@ export const refreshToken = async (req, res) => {
             });
         }
 
-        // Verify refresh token
-        let decoded;
-        try {
-            decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-        } catch {
-            return res.status(401).json({
-                status: false,
-                message: 'Invalid or expired refresh token.'
-            });
-        }
-
-        // Fetch agent
         const agent = await Agent.getAgentByToken(refreshToken);
         if (!agent) {
             return res.status(404).json({
@@ -478,24 +649,16 @@ export const refreshToken = async (req, res) => {
             });
         }
 
-        // Compare stored token
-        if (!agent.refreshToken || agent.refreshToken !== refreshToken) {
-            return res.status(401).json({
-                status: false,
-                message: 'Refresh token mismatch.'
-            });
-        }
-
         // Fetch reference data
         const regions = await Agent.getRegions();
         const departments = await Agent.getDepartments();
         const divisions = await Agent.getDivisionsByRegion(agent.regionId);
 
-        const region = regions.find(r => r.id === agent.regionId);
-        const department = departments.find(d => d.id === agent.departmentId);
-        const division = divisions.find(d => d.id === agent.divisionId);
+        const region = regions.find(r => r.id === agent.regionId) || { regionName: null };
+        const department = departments.find(d => d.id === agent.departmentId) || { departmentName: null };
+        const division = divisions.find(d => d.id === agent.divisionId) || { divisionName: null };
 
-        // New access token
+        // Generate new access token
         const payload = {
             id: agent.id,
             email: agent.email,
@@ -519,10 +682,10 @@ export const refreshToken = async (req, res) => {
 
         res.cookie('ldtsAuth', refreshToken, {
             httpOnly: true,
-            secure: true,
-            sameSite: 'None',
+            secure: true, 
+            sameSite: 'None', 
             maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+        })
 
         res.json({
             status: true,
@@ -543,14 +706,15 @@ export const refreshToken = async (req, res) => {
                 regionName: region?.regionName || null,
                 divisionId: agent.divisionId,
                 divisionName: division?.divisionName || null
-            }
+            },
         });
 
+        
     } catch (err) {
         console.error("REFRESH TOKEN ERROR:", err);
-        res.status(500).json({
-            status: false,
-            message: "Server error"
+        res.status(500).json({ 
+            status: false, 
+            message: "Server error", error: err.message 
         });
     }
-};
+}
