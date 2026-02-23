@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 // ========================= CREATE USER =========================
-export const createUser = async (firstname, middlename, lastname, suffix, email, mobile, userType, role, agentCode, opID) => {
+export const createUser = async (firstname, middlename, lastname, suffix, email, mobile, userType, role, agentCode, region, division, department, opID) => {
     const pool = await poolPromise;
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
@@ -25,12 +25,15 @@ export const createUser = async (firstname, middlename, lastname, suffix, email,
             .input('userType', sql.VarChar(20), userType || null)
             .input('role', sql.VarChar(50), role || null)
             .input('agentCode', sql.VarChar(20), agentCode || null)
+            .input('region', sql.VarChar(50), region || null)
+            .input('division', sql.VarChar(50), division || null)
+            .input('department', sql.VarChar(50), department || null)
             .input('opID', sql.VarChar(20), opID || 'SYSTEM')
             .query(`
                 INSERT INTO [usr].[CWMUSRINF] 
-                (SFNAME, SMNAME, SLNAME, SSUFFIX, SEMAILADD, SMOBILE, SUSRTYPE, SROLE, SAGTCDE, BACTIVE, SOPID, TCRTDT, TMODDT)
+                (SFNAME, SMNAME, SLNAME, SSUFFIX, SEMAILADD, SMOBILE, SUSRTYPE, SROLE, SAGTCDE, SREG, SDIV, SDEPT, BACTIVE, SOPID, TCRTDT, TMODDT)
                 OUTPUT INSERTED.LSEQID AS userId
-                VALUES (@firstname, @middlename, @lastname, @suffix, @email, @mobile, @userType, @role, @agentCode, 1, @opID, GETDATE(), GETDATE())
+                VALUES (@firstname, @middlename, @lastname, @suffix, @email, @mobile, @userType, @role, @agentCode, @region, @division, @department, 1, @opID, GETDATE(), GETDATE())
             `);
         
         const userId = userResult.recordset[0].userId;

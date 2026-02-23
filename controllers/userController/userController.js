@@ -26,13 +26,16 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 // ========================= REGISTER =========================
 export const register = async (req, res) => {
     try {
-        let { firstname, middlename, lastname, suffix, email, mobile, userType, role, agentCode } = req.body;
+        let { firstname, middlename, lastname, suffix, email, mobile, userType, role, agentCode, region, division, department } = req.body;
 
         // normalize optional fields
         agentCode = agentCode?.trim() || null;
         mobile = mobile?.trim() || null;
         userType = userType?.trim() || null;
         role = role?.trim() || null;
+        region = region?.trim() || null;
+        division = division?.trim() || null;
+        department = department?.trim() || null;
 
         // ONLY truly required fields
         if (!firstname || !lastname || !email) {
@@ -81,7 +84,9 @@ export const register = async (req, res) => {
             }
         }
 
-        const opID = req.body.opID || 'SYSTEM';
+        // Extract name from email for opID (e.g., "user@example.com" -> "user")
+        const emailName = email.split('@')[0];
+        const opID = req.body.opID || emailName;
 
         const newUser = await User.createUser(
             firstname,
@@ -93,6 +98,9 @@ export const register = async (req, res) => {
             userType,
             role,
             agentCode,
+            region,
+            division,
+            department,
             opID
         );
 
