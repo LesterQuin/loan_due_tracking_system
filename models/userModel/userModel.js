@@ -38,11 +38,14 @@ export const createUser = async (firstname, middlename, lastname, suffix, email,
         
         const userId = userResult.recordset[0].userId;
         
+        // Use userId as opID for all subsequent operations
+        const createdBy = userId.toString();
+        
         // Insert into CWMUSRLGN (login info with temp password)
         await pool.request()
             .input('userId', sql.BigInt, userId)
             .input('password', sql.VarChar(255), hashedPassword)
-            .input('opID', sql.VarChar(20), opID || 'SYSTEM')
+            .input('opID', sql.VarChar(20), createdBy)
             .query(`
                 INSERT INTO [usr].[CWMUSRLGN] 
                 (LFKUSRINF, SPASSWORD, BTEMPPW, BACTIVE, SOPID, TCRTDT, TMODDT)
@@ -55,7 +58,7 @@ export const createUser = async (firstname, middlename, lastname, suffix, email,
             await pool.request()
                 .input('userId', sql.BigInt, userId)
                 .input('accessLevel', sql.VarChar(10), accessLevel)
-                .input('opID', sql.VarChar(20), opID || 'SYSTEM')
+                .input('opID', sql.VarChar(20), createdBy)
                 .query(`
                     INSERT INTO [usr].[CWMUSRALVL] 
                     (LFKUSRINF, SACLVL, BACTIVE, SOPID, TMODDT)
@@ -126,6 +129,7 @@ export const getUserById = async (userId) => {
                 u.SDIV AS divisionCode,
                 u.SDEPT AS departmentCode,
                 u.BACTIVE AS isActive,
+                l.SPASSWORD AS password,
                 l.BTEMPPW AS mustChangePassword
             FROM [usr].[CWMUSRINF] u
             LEFT JOIN [usr].[CWMUSRLGN] l ON l.LFKUSRINF = u.LSEQID AND l.BACTIVE = 1
@@ -172,6 +176,52 @@ export const updatePassword = async (email, newPassword) => {
             SET SPASSWORD = @password, BTEMPPW = 0, TMODDT = GETDATE()
             WHERE LFKUSRINF = @userId AND BACTIVE = 1
         `);
+};
+
+// ========================= UPDATE USER PROFILE =========================
+export const updateUserProfile = async (userId, { firstname, middlename, lastname, suffix, mobile }) => {
+    const pool = await poolPromise;
+    
+    // Build dynamic query based on provided fields
+    let updateFields = [];
+    let request = pool.request().input('userId', sql.BigInt, userId);
+    
+    if (firstname !== undefined) {
+        updateFields.push('SFNAME = @firstname');
+        request.input('firstname', sql.VarChar(100), firstname);
+    }
+    if (middlename !== undefined) {
+        updateFields.push('SMNAME = @middlename');
+        request.input('middlename', sql.VarChar(100), middlename);
+    }
+    if (lastname !== undefined) {
+        updateFields.push('SLNAME = @lastname');
+        request.input('lastname', sql.VarChar(100), lastname);
+    }
+    if (suffix !== undefined) {
+        updateFields.push('SSUFFIX = @suffix');
+        request.input('suffix', sql.VarChar(20), suffix);
+    }
+    if (mobile !== undefined) {
+        updateFields.push('SMOBILE = @mobile');
+        request.input('mobile', sql.VarChar(50), mobile);
+    }
+    
+    if (updateFields.length === 0) {
+        return { message: 'No fields to update' };
+    }
+    
+    updateFields.push('TMODDT = GETDATE()');
+    
+    const query = `
+        UPDATE [usr].[CWMUSRINF]
+        SET ${updateFields.join(', ')}
+        WHERE LSEQID = @userId AND BACTIVE = 1
+    `;
+    
+    await request.query(query);
+    
+    return { message: 'Profile updated successfully' };
 };
 
 // ========================= SAVE OTP =========================

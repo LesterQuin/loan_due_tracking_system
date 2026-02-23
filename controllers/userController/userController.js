@@ -23,6 +23,17 @@ const transporter = nodemailer.createTransport({
 // Helper: generate random OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+// Helper: generate SOPID from email
+// Format: email name + @ + first letter of domain email (e.g., "john.doe@gmail.com" -> "john.doe@g")
+const generateSOPID = (email) => {
+    if (!email) return null;
+    
+    const [emailName, domain] = email.split('@');
+    const domainFirstLetter = domain ? domain.charAt(0).toLowerCase() : '';
+    
+    return `${emailName}@${domainFirstLetter}`;
+};
+
 // ========================= REGISTER =========================
 export const register = async (req, res) => {
     try {
@@ -33,19 +44,20 @@ export const register = async (req, res) => {
         mobile = mobile?.trim() || null;
         userType = userType?.trim() || null;
         role = role?.trim() || null;
-        region = region?.trim() || null;
-        division = division?.trim() || null;
-        department = department?.trim() || null;
+        // Truncate region, division, department to max 10 chars
+        region = region?.trim() ? region.trim().substring(0, 10) : null;
+        division = division?.trim() ? division.trim().substring(0, 10) : null;
+        department = department?.trim() ? department.trim().substring(0, 10) : null;
 
-        // ONLY truly required fields
-        if (!firstname || !lastname || !email) {
+        // ONLY truly required fields: firstname, lastname, email, userType, mobile
+        if (!firstname || !lastname || !email || !userType || !mobile) {
             return res.status(400).json({
                 status: false,
-                message: "Missing required fields"
+                message: "Missing required fields: firstname, lastname, email, userType, mobile"
             });
         }
 
-        const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i;
+        const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com|sjgem\.net)$/i;
         if (!emailRegex.test(email)) {
             return res.status(400).json({
                 status: false,
@@ -84,10 +96,10 @@ export const register = async (req, res) => {
             }
         }
 
-        // Extract name from email for opID (e.g., "user@example.com" -> "user")
-        const emailName = email.split('@')[0];
-        const opID = req.body.opID || emailName;
+        // Generate SOPID from email (e.g., "john.doe@gmail.com" -> "john.doe@g")
+        const sopID = generateSOPID(email);
 
+        // Use SOPID as opID
         const newUser = await User.createUser(
             firstname,
             middlename,
@@ -101,7 +113,7 @@ export const register = async (req, res) => {
             region,
             division,
             department,
-            opID
+            sopID
         );
 
         // Send email with temp password
@@ -155,25 +167,8 @@ export const login = async (req, res) => {
                 message: 'Invalid credentials.' 
             });
 
-        // Handle temp password change
-        if (user.mustChangePassword) {
-            if (!newPassword) 
-                return res.status(403).json({  
-                    status: false,
-                    message: 'Password reset required. Please provide a new password.' 
-                });
-
-            // Validate new password
-            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
-            if (!passwordRegex.test(newPassword)) 
-                return res.status(400).json({ 
-                    status: false,
-                    message: 'New password must be 8+ chars, include upper, lower, number' 
-                });
-
-            // Update password
-            await User.updatePassword(email, newPassword);
-        }
+        // If user has temp password, allow login but flag it in response
+        const isTempPassword = user.mustChangePassword;
 
         // Generate OTP
         const otp = generateOTP();
@@ -430,6 +425,89 @@ export const resendOTP = async (req, res) => {
         res.status(500).json({ 
             status: false,  
             message: 'Server error', error: err.message 
+        });
+    }
+};
+
+// ========================= UPDATE PROFILE (AUTHENTICATED) =========================
+export const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { currentPassword, newPassword, firstname, middlename, lastname, suffix, mobile } = req.body;
+
+        // Get user by ID
+        const user = await User.getUserById(userId);
+        if (!user) {
+            return res.status(404).json({
+                status: false,
+                message: 'User not found'
+            });
+        }
+
+        // If password change is requested, verify current password
+        if (currentPassword && newPassword) {
+            const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+            if (!isValidPassword) {
+                return res.status(401).json({
+                    status: false,
+                    message: 'Current password is incorrect'
+                });
+            }
+
+            // Validate new password
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
+            if (!passwordRegex.test(newPassword)) {
+                return res.status(400).json({
+                    status: false,
+                    message: 'New password must be 8+ chars, include upper, lower, number'
+                });
+            }
+
+            // Update password using email
+            await User.updatePassword(user.email, newPassword);
+        }
+
+        // Update profile if any profile fields are provided
+        const profileData = {};
+        if (firstname !== undefined) profileData.firstname = firstname || null;
+        if (middlename !== undefined) profileData.middlename = middlename || null;
+        if (lastname !== undefined) profileData.lastname = lastname || null;
+        if (suffix !== undefined) profileData.suffix = suffix || null;
+        if (mobile !== undefined) profileData.mobile = mobile || null;
+
+        if (Object.keys(profileData).length > 0) {
+            await User.updateUserProfile(userId, profileData);
+        }
+
+        // Get updated user info
+        const updatedUser = await User.getUserById(userId);
+
+        res.json({
+            status: true,
+            message: 'Profile updated successfully',
+            user: {
+                id: updatedUser.id,
+                email: updatedUser.email,
+                firstname: updatedUser.firstname,
+                middlename: updatedUser.middlename,
+                lastname: updatedUser.lastname,
+                suffix: updatedUser.suffix,
+                mobile: updatedUser.mobile,
+                userType: updatedUser.userType || null,
+                role: updatedUser.role || null,
+                agentCode: updatedUser.agentCode || null,
+                regionCode: updatedUser.regionCode || null,
+                divisionCode: updatedUser.divisionCode || null,
+                departmentCode: updatedUser.departmentCode || null
+            }
+        });
+
+    } catch (err) {
+        console.error('UPDATE PROFILE ERROR:', err);
+        res.status(500).json({
+            status: false,
+            message: 'Server error',
+            error: err.message
         });
     }
 };

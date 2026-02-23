@@ -22,9 +22,9 @@ export const registerValidation = [
         .trim()
         .isEmail().withMessage('Invalid email format')
         .custom((value) => {
-            const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i;
+            const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com|sjgem\.net)$/i;
             if (!emailRegex.test(value)) {
-                throw new Error('Invalid domain address. Only gmail.com, yahoo.com, and phillifeassurance.onmicrosoft.com are allowed');
+                throw new Error('Invalid domain address. Only gmail.com, yahoo.com, phillifeassurance.onmicrosoft.com, and sjgem.net are allowed');
             }
             return true;
         }),
@@ -34,28 +34,20 @@ export const registerValidation = [
         .trim()
         .isLength({ max: 50 }).withMessage('Agent code must be at most 50 characters'),
     
-    body('departmentId')
-        .optional({ nullable: true, values: 'falsy' })
-        .isInt({ min: 1 }).withMessage('Department ID must be a positive integer'),
-    
-    body('regionId')
-        .optional({ nullable: true, values: 'falsy' })
-        .isInt({ min: 1 }).withMessage('Region ID must be a positive integer'),
-    
-    body('divisionId')
-        .optional({ nullable: true, values: 'falsy' })
-        .isInt({ min: 1 }).withMessage('Division ID must be a positive integer'),
-    
     body('userType')
         .optional({ nullable: true, values: 'falsy' })
         .trim()
-        .isIn(['Admin', 'MD', 'SD', 'FC']).withMessage('Invalid userType. Must be Admin, MD, SD, or FC'),
+        .isIn(['AGENT', 'BRANCH', 'DEPT']).withMessage('Invalid userType. Must be AGENT, BRANCH, or DEPT'),
     
-    body('phoneNumber')
-        .optional()
+    body('role')
+        .optional({ nullable: true, values: 'falsy' })
         .trim()
-        .isLength({ max: 20 }).withMessage('Phone number must be at most 20 characters')
-        .matches(/^[0-9+\-\s()]*$/).withMessage('Invalid phone number format'),
+        .isIn(['SD', 'MD', 'CCO', 'CCA']).withMessage('Invalid role. Must be SD, MD, CCO, or CCA'),
+    
+    body('mobile')
+        .notEmpty().withMessage('Mobile number is required')
+        .trim()
+        .matches(/^(\+63|09)\d{9}$/).withMessage('Mobile must start with +63 or 09 followed by 9 digits'),
 
     (req, res, next) => {
         const errors = validationResult(req);
@@ -75,7 +67,7 @@ export const loginValidation = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .trim()
-        .isEmail().withMessage('Invalid email format'),
+        .isEmail().withMessage(' Invalid email format'),
     
     body('password')
         .notEmpty().withMessage('Password is required')
@@ -105,7 +97,7 @@ export const resetPasswordValidation = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .trim()
-        .isEmail().withMessage('Invalid email format'),
+        .isEmail().withMessage(' Invalid email format'),
     
     body('newPassword')
         .notEmpty().withMessage('New password is required')
@@ -131,7 +123,7 @@ export const verifyOTPValidation = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .trim()
-        .isEmail().withMessage('Invalid email format'),
+        .isEmail().withMessage(' Invalid email format'),
     
     body('otp')
         .notEmpty().withMessage('OTP is required')
@@ -156,7 +148,7 @@ export const resendOTPValidation = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .trim()
-        .isEmail().withMessage('Invalid email format'),
+        .isEmail().withMessage(' Invalid email format'),
 
     (req, res, next) => {
         const errors = validationResult(req);
@@ -176,11 +168,63 @@ export const logoutValidation = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .trim()
-        .isEmail().withMessage('Invalid email format'),
+        .isEmail().withMessage(' Invalid email format'),
     
     body('refreshToken')
         .notEmpty().withMessage('Refresh token is required')
         .trim(),
+
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                status: false,
+                message: 'Validation failed',
+                errors: errors.array()
+            });
+        }
+        next();
+    }
+];
+
+// ========================= UPDATE PROFILE VALIDATION =========================
+export const updateProfileValidation = [
+    // Optional password change
+    body('currentPassword')
+        .optional()
+        .isLength({ min: 1 }).withMessage('Current password is required'),
+    
+    body('newPassword')
+        .optional()
+        .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/)
+        .withMessage('New password must be 8+ chars, include upper, lower, number'),
+    
+    // Optional profile fields - middlename and suffix can be null
+    body('firstname')
+        .optional({ nullable: true, values: 'falsy' })
+        .trim()
+        .isLength({ max: 100 }).withMessage('First name must be at most 100 characters'),
+    
+    body('middlename')
+        .optional({ nullable: true, values: 'falsy' })
+        .trim()
+        .isLength({ max: 100 }).withMessage('Middle name must be at most 100 characters'),
+    
+    body('lastname')
+        .optional({ nullable: true, values: 'falsy' })
+        .trim()
+        .isLength({ max: 100 }).withMessage('Last name must be at most 100 characters'),
+    
+    body('suffix')
+        .optional({ nullable: true, values: 'falsy' })
+        .trim()
+        .isLength({ max: 20 }).withMessage('Suffix must be at most 20 characters'),
+    
+    body('mobile')
+        .optional({ nullable: true, values: 'falsy' })
+        .trim()
+        .matches(/^(\+63|09)\d{9}$/).withMessage('Mobile must start with +63 or 09 followed by 9 digits'),
 
     (req, res, next) => {
         const errors = validationResult(req);
