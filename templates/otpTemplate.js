@@ -7,13 +7,19 @@ export const otpTemplate = (lastname, otp) => {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>One-Time Password</title>
-    </head>
-    <body style="margin:0;padding:0;font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f8f9fa; color:#333;">
+</head>
+<body style="margin:0;padding:0;font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f8f9fa; color:#333;">
     <table role="presentation" style="width:100%; max-width:600px; margin:20px auto; background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden; border-collapse:collapse;">
-        
+
         <!-- Header -->
         <tr>
-        <td style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); text-align:center; padding:20px; color:white;">
+        <td 
+            bgcolor="#4caf50" 
+            style="background-color:#4caf50; 
+                   background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+                   text-align:center; 
+                   padding:20px; 
+                   color:white;">
             <h1 style="margin:0; font-size:24px; font-weight:300;">Loan Due Tracking System OTP Verification</h1>
             <p style="margin:5px 0 0; font-size:14px; opacity:0.9;">Secure login code</p>
         </td>
